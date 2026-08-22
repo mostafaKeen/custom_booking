@@ -8,7 +8,7 @@ define('APP_DEBUG', true);
 
 // Database Configuration
 // DB_DRIVER can be 'sqlite' or 'mysql'
-define('DB_DRIVER', 'sqlite'); 
+define('DB_DRIVER', 'sqlite');
 define('DB_FILE', __DIR__ . '/data/booking.sqlite');
 
 // MySQL Settings (used if DB_DRIVER === 'mysql')
