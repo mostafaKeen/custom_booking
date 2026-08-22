@@ -126,7 +126,7 @@ foreach ($placementsToRegister as $placement) {
         <pre><?= htmlspecialchars($handlerUrl) ?></pre>
 
         <div class="btn-group">
-            <a href="#" onclick="BX24.installComplete(); return false;" class="btn">Finish Installation</a>
+            <a href="#" onclick="if(typeof BX24!=='undefined'){BX24.installFinish();}return false;" class="btn">Finish Installation</a>
             <a href="install.php?rebind=1" class="btn btn-secondary">Force Re-bind Handlers</a>
         </div>
     </div>
@@ -134,7 +134,11 @@ foreach ($placementsToRegister as $placement) {
     <script>
         if (typeof BX24 !== 'undefined') {
             BX24.init(function() {
-                BX24.installComplete();
+                // BX24.installFinish() is the correct method to signal
+                // Bitrix24 that app installation is complete.
+                // Without this, B24 considers the app NOT installed
+                // and will NOT render placement tabs (CRM_LEAD_DETAIL_TAB etc.)
+                BX24.installFinish();
             });
         }
     </script>
