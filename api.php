@@ -1,6 +1,6 @@
 <?php
 /**
- * AJAX API Handler for Custom Booking Widget
+ * AJAX API Handler for Custom Booking Widget with Comprehensive Logging
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/crest.php';
@@ -9,10 +9,27 @@ require_once __DIR__ . '/db.php';
 $action = $_REQUEST['action'] ?? '';
 $db = DB::getConnection();
 
+function writeLog($stage, $data = []) {
+    $logDir = __DIR__ . '/data';
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0755, true);
+    }
+    $logFile = $logDir . '/booking_debug.log';
+    $time = date('Y-m-d H:i:s');
+    $content = "[{$time}] [{$stage}] " . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . PHP_EOL . str_repeat('-', 80) . PHP_EOL;
+    file_put_contents($logFile, $content, FILE_APPEND);
+}
+
 function sendJson($data) {
     echo json_encode($data);
     exit;
 }
+
+writeLog("API_REQUEST_START", [
+    'action' => $action,
+    'method' => $_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN',
+    'request_params' => $_REQUEST
+]);
 
 try {
     switch ($action) {
@@ -20,15 +37,18 @@ try {
             $services = $db->query("SELECT * FROM services ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
             $staff = $db->query("SELECT * FROM staff WHERE is_active = 1 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
             
-            // Optionally fetch native Bitrix24 online booking resources via REST API
+            // Fetch native Bitrix24 online booking resources via REST API
             $b24Resources = [];
             $res = CRest::call('booking.v1.resource.list', []);
+            writeLog("REST_CALL_booking.v1.resource.list", $res);
+
             if (!empty($res['result']['resources'])) {
                 $b24Resources = $res['result']['resources'];
             } else {
-                $res = CRest::call('calendar.resource.list', []);
-                if (!empty($res['result'])) {
-                    $b24Resources = $res['result'];
+                $resCal = CRest::call('calendar.resource.list', []);
+                writeLog("REST_CALL_calendar.resource.list", $resCal);
+                if (!empty($resCal['result'])) {
+                    $b24Resources = $resCal['result'];
                 }
             }
 
@@ -121,11 +141,22 @@ try {
             $staffId = (int)($_REQUEST['staff_id'] ?? 0);
             $bookingDate = $_REQUEST['booking_date'] ?? date('Y-m-d');
             $startTime = $_REQUEST['start_time'] ?? '09:00:00';
-            $calendarTarget = $_REQUEST['calendar_target'] ?? 'responsible'; // 'responsible', 'shared', or 'native_resource'
+            $calendarTarget = $_REQUEST['calendar_target'] ?? 'responsible';
             $clientName = trim($_REQUEST['client_name'] ?? '');
             $clientPhone = trim($_REQUEST['client_phone'] ?? '');
             $clientEmail = trim($_REQUEST['client_email'] ?? '');
             $notes = trim($_REQUEST['notes'] ?? '');
+
+            writeLog("CREATE_BOOKING_START", [
+                'entityType' => $entityType,
+                'entityId' => $entityId,
+                'serviceId' => $serviceId,
+                'staffId' => $staffId,
+                'bookingDate' => $bookingDate,
+                'startTime' => $startTime,
+                'calendarTarget' => $calendarTarget,
+                'clientName' => $clientName
+            ]);
 
             // Calculate end time based on service duration
             $stmt = $db->prepare("SELECT name, duration_minutes FROM services WHERE id = ?");
@@ -145,29 +176,32 @@ try {
             $staffName = $staff ? $staff['name'] : 'Specialist';
             $b24UserId = $staff ? (int)$staff['b24_user_id'] : 1;
 
-            // 1. Insert into local DB
+            // Step 1: Insert into local DB
             $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?)");
             $stmt->execute([
                 $entityType, $entityId, $clientName, $clientPhone, $clientEmail,
                 $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes
             ]);
             $bookingId = $db->lastInsertId();
+            writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId]);
 
-            // 2. Fetch Entity owner in B24 to target calendar if responsible
+            // Step 2: Fetch Entity owner in B24
             $ownerId = $b24UserId;
             if ($entityType === 'LEAD' && $entityId > 0) {
                 $leadRes = CRest::call('crm.lead.get', ['id' => $entityId]);
+                writeLog("STEP_2_CRM_LEAD_GET", $leadRes);
                 if (!empty($leadRes['result']['ASSIGNED_BY_ID'])) {
                     $ownerId = (int)$leadRes['result']['ASSIGNED_BY_ID'];
                 }
             } elseif ($entityType === 'DEAL' && $entityId > 0) {
                 $dealRes = CRest::call('crm.deal.get', ['id' => $entityId]);
+                writeLog("STEP_2_CRM_DEAL_GET", $dealRes);
                 if (!empty($dealRes['result']['ASSIGNED_BY_ID'])) {
                     $ownerId = (int)$dealRes['result']['ASSIGNED_BY_ID'];
                 }
             }
 
-            // 3. Create Bitrix24 CRM Timeline Activity (crm.activity.add)
+            // Step 3: Create CRM Activity (crm.activity.add)
             $activitySubject = "Booking: {$serviceName} with {$staffName}";
             $activityDesc = "Appointment Details:\n"
                 . "Service: {$serviceName}\n"
@@ -195,10 +229,10 @@ try {
                     'TYPE_ID' => 2, // Meeting
                 ]
             ]);
-
+            writeLog("STEP_3_CRM_ACTIVITY_ADD", $activityRes);
             $b24ActivityId = $activityRes['result'] ?? 0;
 
-            // 4. Create Bitrix24 Calendar Event (calendar.event.add)
+            // Step 4: Create Calendar Event (calendar.event.add)
             $b24CalendarEventId = 0;
             $targetOwner = ($calendarTarget === 'shared') ? DEFAULT_SHARED_CALENDAR_ID : $ownerId;
 
@@ -212,9 +246,10 @@ try {
                 'skip_time' => 'N',
                 'section' => 0
             ]);
+            writeLog("STEP_4_CALENDAR_EVENT_ADD", $calRes);
             $b24CalendarEventId = $calRes['result'] ?? 0;
 
-            // 5. Sync to Bitrix24 Native Online Booking Grid (/booking/) via booking.v1.booking.add
+            // Step 5: Sync to Native Online Booking (/booking/) via booking.v1.booking.add
             $b24NativeBookingId = 0;
             $nativeRes = CRest::call('booking.v1.booking.add', [
                 'name' => "{$serviceName} - {$clientName}",
@@ -231,30 +266,35 @@ try {
                     ]
                 ]
             ]);
+            writeLog("STEP_5_BOOKING_V1_BOOKING_ADD", $nativeRes);
+
             if (!empty($nativeRes['result']['id'])) {
                 $b24NativeBookingId = $nativeRes['result']['id'];
             }
 
-            // Update booking record with B24 IDs
+            // Update local DB
             $stmt = $db->prepare("UPDATE bookings SET b24_activity_id = ?, b24_calendar_event_id = ? WHERE id = ?");
             $stmt->execute([$b24ActivityId, $b24CalendarEventId, $bookingId]);
 
-            // 6. Send Notification to Staff (im.notification.add)
+            // Step 6: Send Staff Notification (im.notification.add)
             if ($b24UserId > 0) {
-                CRest::call('im.notification.add', [
+                $notifRes = CRest::call('im.notification.add', [
                     'TO' => $b24UserId,
                     'MESSAGE' => "New Booking Scheduled: {$serviceName} for {$clientName} on {$bookingDate} at " . date('h:i A', $startTs)
                 ]);
+                writeLog("STEP_6_IM_NOTIFICATION_ADD", $notifRes);
             }
 
-            sendJson([
+            $response = [
                 'status' => 'success',
                 'message' => 'Booking created successfully!',
                 'booking_id' => $bookingId,
                 'activity_id' => $b24ActivityId,
                 'calendar_event_id' => $b24CalendarEventId,
                 'native_booking_id' => $b24NativeBookingId
-            ]);
+            ];
+            writeLog("CREATE_BOOKING_COMPLETE", $response);
+            sendJson($response);
             break;
 
         case 'update_status':
@@ -264,13 +304,21 @@ try {
             $stmt = $db->prepare("UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
             $stmt->execute([$newStatus, $bookingId]);
 
+            writeLog("UPDATE_STATUS", ['booking_id' => $bookingId, 'new_status' => $newStatus]);
             sendJson(['status' => 'success', 'message' => 'Status updated to ' . $newStatus]);
             break;
 
         default:
+            writeLog("UNKNOWN_ACTION", ['action' => $action]);
             sendJson(['status' => 'error', 'message' => 'Invalid action']);
             break;
     }
 } catch (Exception $e) {
+    writeLog("API_EXCEPTION_ERROR", [
+        'error_message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'trace' => $e->getTraceAsString()
+    ]);
     sendJson(['status' => 'error', 'message' => $e->getMessage()]);
 }
