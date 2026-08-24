@@ -42,7 +42,9 @@ try {
             $res = CRest::call('booking.v1.resource.list', []);
             writeLog("REST_CALL_booking.v1.resource.list", $res);
 
-            if (!empty($res['result']['resources'])) {
+            if (!empty($res['result']['resource'])) {
+                $b24Resources = $res['result']['resource'];
+            } elseif (!empty($res['result']['resources'])) {
                 $b24Resources = $res['result']['resources'];
             } else {
                 $resCal = CRest::call('calendar.resource.list', []);
@@ -277,11 +279,15 @@ try {
             $resList = CRest::call('booking.v1.resource.list', []);
             writeLog("STEP_5_RESOURCE_LIST_CHECK", $resList);
 
-            if (!empty($resList['result']['resources'])) {
-                foreach ($resList['result']['resources'] as $resItem) {
+            $resourceArray = $resList['result']['resource'] ?? ($resList['result']['resources'] ?? ($resList['result'] ?? []));
+            if (is_array($resourceArray)) {
+                foreach ($resourceArray as $resItem) {
                     if (!empty($resItem['id'])) {
                         $resourceIds[] = (int)$resItem['id'];
-                        break; // Use first active resource
+                        break; // Use first active resource (Driver: 1, Meeting Room: 3, etc.)
+                    } elseif (!empty($resItem['ID'])) {
+                        $resourceIds[] = (int)$resItem['ID'];
+                        break;
                     }
                 }
             }
