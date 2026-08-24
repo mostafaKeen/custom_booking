@@ -43,8 +43,15 @@ header('Content-Security-Policy: frame-ancestors *');
                     </div>
 
                     <div class="form-group">
-                        <label for="staff_id">Assigned Specialist / Resource</label>
+                        <label for="staff_id">Assigned Specialist (Local)</label>
                         <select id="staff_id" name="staff_id" class="form-control" required></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="b24_resource_id">Bitrix24 Booking Resource</label>
+                        <select id="b24_resource_id" name="b24_resource_id" class="form-control" required>
+                            <!-- Dynamically loaded resources from Bitrix24 -->
+                        </select>
                     </div>
 
                     <div class="form-group">

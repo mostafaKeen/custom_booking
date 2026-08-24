@@ -90,6 +90,16 @@ function loadServicesAndStaff() {
                     staffSelect.innerHTML += '<option value="' + st.id + '">' + st.name + '</option>';
                 });
 
+                var b24ResourceSelect = document.getElementById('b24_resource_id');
+                b24ResourceSelect.innerHTML = '';
+                if (data.b24_resources && data.b24_resources.length > 0) {
+                    data.b24_resources.forEach(function(r) {
+                        b24ResourceSelect.innerHTML += '<option value="' + r.id + '">' + r.name + '</option>';
+                    });
+                } else {
+                    b24ResourceSelect.innerHTML = '<option value="">No Active Bitrix24 Resources</option>';
+                }
+
                 document.getElementById('booking_date').value = new Date().toISOString().split('T')[0];
                 loadSlots();
             }

@@ -141,6 +141,7 @@ try {
             $entityId = (int)($_REQUEST['entity_id'] ?? 0);
             $serviceId = (int)($_REQUEST['service_id'] ?? 0);
             $staffId = (int)($_REQUEST['staff_id'] ?? 0);
+            $b24ResourceId = (int)($_REQUEST['b24_resource_id'] ?? 0);
             $bookingDate = $_REQUEST['booking_date'] ?? date('Y-m-d');
             $startTime = $_REQUEST['start_time'] ?? '09:00:00';
             $calendarTarget = $_REQUEST['calendar_target'] ?? 'responsible';
@@ -154,6 +155,7 @@ try {
                 'entityId' => $entityId,
                 'serviceId' => $serviceId,
                 'staffId' => $staffId,
+                'b24ResourceId' => $b24ResourceId,
                 'bookingDate' => $bookingDate,
                 'startTime' => $startTime,
                 'calendarTarget' => $calendarTarget,
@@ -187,19 +189,26 @@ try {
             $bookingId = $db->lastInsertId();
             writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId]);
 
-            // Step 2: Fetch Entity owner in B24
+            // Step 2: Fetch Entity owner & linked Contact in B24
             $ownerId = $b24UserId;
+            $contactId = 0;
             if ($entityType === 'LEAD' && $entityId > 0) {
                 $leadRes = CRest::call('crm.lead.get', ['id' => $entityId]);
                 writeLog("STEP_2_CRM_LEAD_GET", $leadRes);
                 if (!empty($leadRes['result']['ASSIGNED_BY_ID'])) {
                     $ownerId = (int)$leadRes['result']['ASSIGNED_BY_ID'];
                 }
+                if (!empty($leadRes['result']['CONTACT_ID'])) {
+                    $contactId = (int)$leadRes['result']['CONTACT_ID'];
+                }
             } elseif ($entityType === 'DEAL' && $entityId > 0) {
                 $dealRes = CRest::call('crm.deal.get', ['id' => $entityId]);
                 writeLog("STEP_2_CRM_DEAL_GET", $dealRes);
                 if (!empty($dealRes['result']['ASSIGNED_BY_ID'])) {
                     $ownerId = (int)$dealRes['result']['ASSIGNED_BY_ID'];
+                }
+                if (!empty($dealRes['result']['CONTACT_ID'])) {
+                    $contactId = (int)$dealRes['result']['CONTACT_ID'];
                 }
             }
 
@@ -276,18 +285,24 @@ try {
             // Step 5: Sync to Native Online Booking (/booking/) via booking.v1.booking.add
             $b24NativeBookingId = 0;
             $resourceIds = [];
-            $resList = CRest::call('booking.v1.resource.list', []);
-            writeLog("STEP_5_RESOURCE_LIST_CHECK", $resList);
 
-            $resourceArray = $resList['result']['resource'] ?? ($resList['result']['resources'] ?? ($resList['result'] ?? []));
-            if (is_array($resourceArray)) {
-                foreach ($resourceArray as $resItem) {
-                    if (!empty($resItem['id'])) {
-                        $resourceIds[] = (int)$resItem['id'];
-                        break; // Use first active resource (Driver: 1, Meeting Room: 3, etc.)
-                    } elseif (!empty($resItem['ID'])) {
-                        $resourceIds[] = (int)$resItem['ID'];
-                        break;
+            if ($b24ResourceId > 0) {
+                $resourceIds[] = $b24ResourceId;
+            } else {
+                // Fallback to fetch first active resource
+                $resList = CRest::call('booking.v1.resource.list', []);
+                writeLog("STEP_5_RESOURCE_LIST_CHECK", $resList);
+
+                $resourceArray = $resList['result']['resource'] ?? ($resList['result']['resources'] ?? ($resList['result'] ?? []));
+                if (is_array($resourceArray)) {
+                    foreach ($resourceArray as $resItem) {
+                        if (!empty($resItem['id'])) {
+                            $resourceIds[] = (int)$resItem['id'];
+                            break;
+                        } elseif (!empty($resItem['ID'])) {
+                            $resourceIds[] = (int)$resItem['ID'];
+                            break;
+                        }
                     }
                 }
             }
@@ -317,8 +332,40 @@ try {
                 } elseif (!empty($nativeRes['result']) && is_numeric($nativeRes['result'])) {
                     $b24NativeBookingId = $nativeRes['result'];
                 }
+
+                // Call client.set if Contact ID is resolved
+                if ($b24NativeBookingId > 0 && $contactId > 0) {
+                    $clientSetRes = CRest::call('booking.v1.booking.client.set', [
+                        'bookingId' => $b24NativeBookingId,
+                        'clients' => [
+                            [
+                                'id' => $contactId,
+                                'type' => [
+                                    'module' => 'crm',
+                                    'code' => 'CONTACT'
+                                ]
+                            ]
+                        ]
+                    ]);
+                    writeLog("STEP_5_BOOKING_CLIENT_SET", $clientSetRes);
+                }
+
+                // Call externalData.set to link to the source Lead or Deal
+                if ($b24NativeBookingId > 0 && $entityId > 0) {
+                    $extDataSetRes = CRest::call('booking.v1.booking.externalData.set', [
+                        'bookingId' => $b24NativeBookingId,
+                        'externalData' => [
+                            [
+                                'moduleId' => 'crm',
+                                'entityTypeId' => ($entityType === 'LEAD' ? 'LEAD' : 'DEAL'),
+                                'value' => (string)$entityId
+                            ]
+                        ]
+                    ]);
+                    writeLog("STEP_5_BOOKING_EXTERNAL_DATA_SET", $extDataSetRes);
+                }
             } else {
-                writeLog("STEP_5_BOOKING_V1_BOOKING_ADD_SKIPPED", ['reason' => 'No active resourceIds found in Bitrix24 booking.v1.resource.list']);
+                writeLog("STEP_5_BOOKING_V1_BOOKING_ADD_SKIPPED", ['reason' => 'No active resourceIds selected or found']);
             }
 
             // Update local DB with B24 IDs
