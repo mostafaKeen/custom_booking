@@ -294,20 +294,19 @@ try {
 
             if (!empty($resourceIds)) {
                 $nativeRes = CRest::call('booking.v1.booking.add', [
-                    'resourceIds' => $resourceIds,
-                    'datePeriod' => [
-                        'from' => date('Y-m-d\TH:i:sP', $startTs),
-                        'to' => date('Y-m-d\TH:i:sP', $endTs)
-                    ],
-                    'name' => "{$serviceName} - {$clientName}",
-                    'notes' => $notes,
-                    'clients' => [
-                        [
-                            'type' => ($entityType === 'LEAD' ? 'CRM_LEAD' : 'CRM_DEAL'),
-                            'id' => $entityId,
-                            'name' => $clientName,
-                            'phone' => $clientPhone,
-                            'email' => $clientEmail
+                    'fields' => [
+                        'name' => "{$serviceName} - {$clientName}",
+                        'description' => $notes,
+                        'resourceIds' => $resourceIds,
+                        'datePeriod' => [
+                            'from' => [
+                                'timestamp' => $startTs,
+                                'timezone' => 'Asia/Dubai'
+                            ],
+                            'to' => [
+                                'timestamp' => $endTs,
+                                'timezone' => 'Asia/Dubai'
+                            ]
                         ]
                     ]
                 ]);
@@ -315,6 +314,8 @@ try {
 
                 if (!empty($nativeRes['result']['id'])) {
                     $b24NativeBookingId = $nativeRes['result']['id'];
+                } elseif (!empty($nativeRes['result']) && is_numeric($nativeRes['result'])) {
+                    $b24NativeBookingId = $nativeRes['result'];
                 }
             } else {
                 writeLog("STEP_5_BOOKING_V1_BOOKING_ADD_SKIPPED", ['reason' => 'No active resourceIds found in Bitrix24 booking.v1.resource.list']);
