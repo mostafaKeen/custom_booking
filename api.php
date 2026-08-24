@@ -276,12 +276,18 @@ try {
             $stmt = $db->prepare("UPDATE bookings SET b24_activity_id = ?, b24_calendar_event_id = ? WHERE id = ?");
             $stmt->execute([$b24ActivityId, $b24CalendarEventId, $bookingId]);
 
-            // Step 6: Send Staff Notification (im.notification.add)
+            // Step 6: Send Staff Notification (im.notify.system.add)
             if ($b24UserId > 0) {
-                $notifRes = CRest::call('im.notification.add', [
-                    'TO' => $b24UserId,
+                $notifRes = CRest::call('im.notify.system.add', [
+                    'USER_ID' => $b24UserId,
                     'MESSAGE' => "New Booking Scheduled: {$serviceName} for {$clientName} on {$bookingDate} at " . date('h:i A', $startTs)
                 ]);
+                if (isset($notifRes['error'])) {
+                    $notifRes = CRest::call('im.notify.personal.add', [
+                        'USER_ID' => $b24UserId,
+                        'MESSAGE' => "New Booking Scheduled: {$serviceName} for {$clientName} on {$bookingDate} at " . date('h:i A', $startTs)
+                    ]);
+                }
                 writeLog("STEP_6_IM_NOTIFICATION_ADD", $notifRes);
             }
 

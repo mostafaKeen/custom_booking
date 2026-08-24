@@ -9,13 +9,28 @@ class CRest {
 
     public static function call($method, $params = []) {
         $arSettings = static::getSettings();
+
+        // Update settings from incoming request parameters if provided by Bitrix24 iframe/AJAX
+        $hasNewTokens = false;
+        if (!empty($_REQUEST['AUTH_ID']) && (!isset($arSettings['AUTH_ID']) || $_REQUEST['AUTH_ID'] !== $arSettings['AUTH_ID'])) {
+            $arSettings['AUTH_ID'] = $_REQUEST['AUTH_ID'];
+            $hasNewTokens = true;
+        }
+        if (!empty($_REQUEST['REFRESH_ID'])) {
+            $arSettings['REFRESH_ID'] = $_REQUEST['REFRESH_ID'];
+            $hasNewTokens = true;
+        }
+        if (!empty($_REQUEST['DOMAIN'])) {
+            $arSettings['DOMAIN'] = $_REQUEST['DOMAIN'];
+            $hasNewTokens = true;
+        }
+
+        if ($hasNewTokens) {
+            static::setSettings($arSettings);
+        }
+
         if (empty($arSettings['DOMAIN']) || (empty($arSettings['AUTH_ID']) && empty($arSettings['WEBHOOK_URL']))) {
-            // Check request parameters if passed via Bitrix24 placement iframe POST/GET
-            if (!empty($_REQUEST['DOMAIN']) && !empty($_REQUEST['AUTH_ID'])) {
-                $arSettings['DOMAIN'] = $_REQUEST['DOMAIN'];
-                $arSettings['AUTH_ID'] = $_REQUEST['AUTH_ID'];
-                $arSettings['REFRESH_ID'] = $_REQUEST['REFRESH_ID'] ?? '';
-            }
+            return ['error' => 'NO_AUTH_SETTINGS', 'error_description' => 'Bitrix24 domain or AUTH_ID not configured.'];
         }
 
         if (!empty($arSettings['WEBHOOK_URL'])) {
@@ -23,7 +38,7 @@ class CRest {
             $queryData = http_build_query($params);
         } else {
             $url = 'https://' . $arSettings['DOMAIN'] . '/rest/' . $method . '.json';
-            $params['auth'] = $arSettings['AUTH_ID'] ?? ($_REQUEST['AUTH_ID'] ?? '');
+            $params['auth'] = $arSettings['AUTH_ID'];
             $queryData = http_build_query($params);
         }
 
@@ -47,9 +62,10 @@ class CRest {
 
         $response = json_decode($result, true);
 
-        // Check if token expired and handle refresh if needed
+        // Check if token expired and handle refresh
         if (isset($response['error']) && in_array($response['error'], ['expired_token', 'invalid_token'])) {
             if (static::refreshToken()) {
+                // Token refreshed, retry API call once
                 return static::call($method, $params);
             }
         }
@@ -99,7 +115,9 @@ class CRest {
         $response = json_decode($result, true);
         if (!empty($response['access_token'])) {
             $arSettings['AUTH_ID'] = $response['access_token'];
-            $arSettings['REFRESH_ID'] = $response['refresh_token'];
+            if (!empty($response['refresh_token'])) {
+                $arSettings['REFRESH_ID'] = $response['refresh_token'];
+            }
             static::setSettings($arSettings);
             return true;
         }

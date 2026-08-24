@@ -13,9 +13,26 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
 });
 
+function getAuthParams() {
+    let params = '';
+    if (typeof BX24 !== 'undefined' && BX24 !== null) {
+        try {
+            const auth = BX24.getAuth();
+            if (auth && auth.access_token) {
+                params += '&AUTH_ID=' + encodeURIComponent(auth.access_token);
+            }
+            if (auth && auth.refresh_token) {
+                params += '&REFRESH_ID=' + encodeURIComponent(auth.refresh_token);
+            }
+            if (auth && auth.domain) {
+                params += '&DOMAIN=' + encodeURIComponent(auth.domain);
+            }
+        } catch (e) {}
+    }
+    return params;
+}
+
 function initBX24() {
-    // BX24 JS SDK only works inside Bitrix24 iframe.
-    // When opened directly in a browser, BX24 will be undefined or throw an error.
     if (typeof BX24 === 'undefined' || BX24 === null) {
         console.warn('BX24 JS SDK not available. Running in standalone/debug mode.');
         initStandaloneMode();
@@ -27,7 +44,6 @@ function initBX24() {
             try {
                 var placement = BX24.placement.info();
                 if (placement && placement.options) {
-                    // Determine Entity Type from placement code
                     if (placement.placement === 'CRM_DEAL_DETAIL_TAB') {
                         placementInfo.entityType = 'DEAL';
                     } else {
@@ -36,7 +52,6 @@ function initBX24() {
                     placementInfo.entityId = placement.options.ID || placement.options.id || 0;
                 }
 
-                // Adjust iframe size automatically
                 BX24.resizeWindow(document.body.scrollWidth, Math.max(document.body.scrollHeight, 650));
                 loadEntityBookings();
             } catch(e) {
@@ -51,7 +66,6 @@ function initBX24() {
 }
 
 function initStandaloneMode() {
-    // Fallback for standalone/debug or when BX24 SDK not in iframe context
     var urlParams = new URLSearchParams(window.location.search);
     placementInfo.entityType = urlParams.get('entity_type') || 'LEAD';
     placementInfo.entityId = parseInt(urlParams.get('entity_id') || '1', 10);
@@ -59,7 +73,7 @@ function initStandaloneMode() {
 }
 
 function loadServicesAndStaff() {
-    fetch('api.php?action=get_services_and_staff')
+    fetch('api.php?action=get_services_and_staff' + getAuthParams())
         .then(function(res) { return res.json(); })
         .then(function(data) {
             if (data.status === 'success') {
@@ -76,7 +90,6 @@ function loadServicesAndStaff() {
                     staffSelect.innerHTML += '<option value="' + st.id + '">' + st.name + '</option>';
                 });
 
-                // Set default date to today and load slots
                 document.getElementById('booking_date').value = new Date().toISOString().split('T')[0];
                 loadSlots();
             }
@@ -93,7 +106,7 @@ function loadSlots() {
 
     if (!serviceId || !staffId || !date) return;
 
-    fetch('api.php?action=get_slots&service_id=' + serviceId + '&staff_id=' + staffId + '&date=' + date)
+    fetch('api.php?action=get_slots&service_id=' + serviceId + '&staff_id=' + staffId + '&date=' + date + getAuthParams())
         .then(function(res) { return res.json(); })
         .then(function(data) {
             var slotsContainer = document.getElementById('slots_container');
@@ -145,7 +158,10 @@ function setupEventListeners() {
         formData.append('entity_id', placementInfo.entityId);
         formData.append('start_time', selectedSlot);
 
-        fetch('api.php', {
+        // Include auth params in POST URL
+        const postUrl = 'api.php?' + getAuthParams().substring(1);
+
+        fetch(postUrl, {
             method: 'POST',
             body: formData
         })
@@ -167,7 +183,7 @@ function setupEventListeners() {
 }
 
 function loadEntityBookings() {
-    fetch('api.php?action=get_entity_bookings&entity_type=' + placementInfo.entityType + '&entity_id=' + placementInfo.entityId)
+    fetch('api.php?action=get_entity_bookings&entity_type=' + placementInfo.entityType + '&entity_id=' + placementInfo.entityId + getAuthParams())
         .then(function(res) { return res.json(); })
         .then(function(data) {
             var list = document.getElementById('bookings_list');
@@ -200,7 +216,6 @@ function loadEntityBookings() {
                 list.innerHTML = '<p style="font-size:13px; text-align:center; padding:20px; color:#64748b;">No bookings found for this record.</p>';
             }
 
-            // Resize Bitrix24 iframe if available
             if (typeof BX24 !== 'undefined' && BX24 !== null) {
                 try {
                     BX24.resizeWindow(document.body.scrollWidth, Math.max(document.body.scrollHeight, 650));
@@ -220,7 +235,9 @@ function updateStatus(bookingId, status) {
     formData.append('booking_id', bookingId);
     formData.append('status', status);
 
-    fetch('api.php', {
+    const postUrl = 'api.php?' + getAuthParams().substring(1);
+
+    fetch(postUrl, {
         method: 'POST',
         body: formData
     })
