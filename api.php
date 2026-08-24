@@ -120,6 +120,16 @@ try {
             sendJson(['status' => 'success', 'slots' => $slots, 'date' => $date]);
             break;
 
+        case 'get_all_bookings':
+            $stmt = $db->query("SELECT b.*, s.name as service_name, s.color as service_color, st.name as staff_name 
+                                  FROM bookings b 
+                                  LEFT JOIN services s ON b.service_id = s.id 
+                                  LEFT JOIN staff st ON b.staff_id = st.id 
+                                  ORDER BY b.booking_date DESC, b.start_time DESC");
+            $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            sendJson(['status' => 'success', 'bookings' => $bookings]);
+            break;
+
         case 'get_entity_bookings':
             $entityType = $_REQUEST['entity_type'] ?? 'LEAD';
             $entityId = (int)($_REQUEST['entity_id'] ?? 0);

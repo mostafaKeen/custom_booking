@@ -46,14 +46,25 @@ function initBX24() {
                 if (placement && placement.options) {
                     if (placement.placement === 'CRM_DEAL_DETAIL_TAB') {
                         placementInfo.entityType = 'DEAL';
-                    } else {
+                        placementInfo.entityId = placement.options.ID || placement.options.id || 0;
+                    } else if (placement.placement === 'CRM_LEAD_DETAIL_TAB') {
                         placementInfo.entityType = 'LEAD';
+                        placementInfo.entityId = placement.options.ID || placement.options.id || 0;
+                    } else {
+                        // Opened from direct link or custom app list
+                        placementInfo.entityId = 0;
                     }
-                    placementInfo.entityId = placement.options.ID || placement.options.id || 0;
+                } else {
+                    placementInfo.entityId = 0;
                 }
 
                 BX24.resizeWindow(document.body.scrollWidth, Math.max(document.body.scrollHeight, 650));
-                loadEntityBookings();
+                
+                if (placementInfo.entityId == 0) {
+                    adjustLayoutForStandalone();
+                } else {
+                    loadEntityBookings();
+                }
             } catch(e) {
                 console.error('BX24 placement.info() error:', e);
                 initStandaloneMode();
@@ -67,9 +78,36 @@ function initBX24() {
 
 function initStandaloneMode() {
     var urlParams = new URLSearchParams(window.location.search);
-    placementInfo.entityType = urlParams.get('entity_type') || 'LEAD';
-    placementInfo.entityId = parseInt(urlParams.get('entity_id') || '1', 10);
-    loadEntityBookings();
+    placementInfo.entityType = urlParams.get('entity_type') || '';
+    placementInfo.entityId = parseInt(urlParams.get('entity_id') || '0', 10);
+
+    if (placementInfo.entityId == 0) {
+        adjustLayoutForStandalone();
+    } else {
+        loadEntityBookings();
+    }
+}
+
+function adjustLayoutForStandalone() {
+    // Hide Left Form Column (since we are not inside a specific Lead/Deal card)
+    const formCard = document.getElementById('booking_form').closest('.card');
+    if (formCard) {
+        formCard.style.display = 'none';
+    }
+
+    // Make Right Bookings Column Full Width
+    const grid = document.querySelector('.booking-grid');
+    if (grid) {
+        grid.style.gridTemplateColumns = '1fr';
+    }
+
+    // Change title of bookings card
+    const bookingsTitle = document.querySelector('.booking-grid .card:last-child .card-title');
+    if (bookingsTitle) {
+        bookingsTitle.innerHTML = 'All Scheduled Appointments';
+    }
+
+    loadAllBookings();
 }
 
 function loadServicesAndStaff() {
@@ -168,7 +206,6 @@ function setupEventListeners() {
         formData.append('entity_id', placementInfo.entityId);
         formData.append('start_time', selectedSlot);
 
-        // Include auth params in POST URL
         const postUrl = 'api.php?' + getAuthParams().substring(1);
 
         fetch(postUrl, {
@@ -192,49 +229,73 @@ function setupEventListeners() {
     });
 }
 
+function loadAllBookings() {
+    fetch('api.php?action=get_all_bookings' + getAuthParams())
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            renderBookingsList(data);
+        })
+        .catch(function(err) {
+            console.error('Failed to load all bookings:', err);
+        });
+}
+
 function loadEntityBookings() {
     fetch('api.php?action=get_entity_bookings&entity_type=' + placementInfo.entityType + '&entity_id=' + placementInfo.entityId + getAuthParams())
         .then(function(res) { return res.json(); })
         .then(function(data) {
-            var list = document.getElementById('bookings_list');
-            list.innerHTML = '';
-
-            if (data.status === 'success' && data.bookings.length > 0) {
-                data.bookings.forEach(function(b) {
-                    var statusClass = 'status-' + b.status.toLowerCase();
-                    var item = document.createElement('div');
-                    item.className = 'booking-item';
-                    item.innerHTML =
-                        '<div class="booking-item-header">' +
-                            '<span class="service-badge" style="background-color: ' + (b.service_color || '#2563eb') + '">' + b.service_name + '</span>' +
-                            '<span class="status-pill ' + statusClass + '">' + b.status + '</span>' +
-                        '</div>' +
-                        '<div class="booking-details">' +
-                            '<strong>Date:</strong> ' + b.booking_date + ' (' + b.start_time + ' - ' + b.end_time + ')<br>' +
-                            '<strong>Staff:</strong> ' + b.staff_name + '<br>' +
-                            '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
-                            '<strong>Target Calendar:</strong> ' + b.calendar_target +
-                        '</div>' +
-                        '<div class="booking-actions">' +
-                            '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Confirmed\')">Confirm</button>' +
-                            '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Completed\')">Complete</button>' +
-                            '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Cancelled\')">Cancel</button>' +
-                        '</div>';
-                    list.appendChild(item);
-                });
-            } else {
-                list.innerHTML = '<p style="font-size:13px; text-align:center; padding:20px; color:#64748b;">No bookings found for this record.</p>';
-            }
-
-            if (typeof BX24 !== 'undefined' && BX24 !== null) {
-                try {
-                    BX24.resizeWindow(document.body.scrollWidth, Math.max(document.body.scrollHeight, 650));
-                } catch(e) {}
-            }
+            renderBookingsList(data);
         })
         .catch(function(err) {
             console.error('Failed to load bookings:', err);
         });
+}
+
+function renderBookingsList(data) {
+    var list = document.getElementById('bookings_list');
+    list.innerHTML = '';
+
+    if (data.status === 'success' && data.bookings.length > 0) {
+        data.bookings.forEach(function(b) {
+            var statusClass = 'status-' + b.status.toLowerCase();
+            var item = document.createElement('div');
+            item.className = 'booking-item';
+            
+            var crmBadge = '';
+            if (b.entity_id > 0) {
+                crmBadge = '<span style="font-size:11px; font-weight:bold; background:#e2e8f0; color:#475569; padding:2px 6px; border-radius:4px; margin-right:6px;">' + b.entity_type + ': ' + b.entity_id + '</span>';
+            }
+
+            item.innerHTML =
+                '<div class="booking-item-header">' +
+                    '<div>' +
+                        '<span class="service-badge" style="background-color: ' + (b.service_color || '#2563eb') + '">' + b.service_name + '</span>' +
+                        crmBadge +
+                    '</div>' +
+                    '<span class="status-pill ' + statusClass + '">' + b.status + '</span>' +
+                '</div>' +
+                '<div class="booking-details">' +
+                    '<strong>Date:</strong> ' + b.booking_date + ' (' + b.start_time + ' - ' + b.end_time + ')<br>' +
+                    '<strong>Staff:</strong> ' + b.staff_name + '<br>' +
+                    '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
+                    '<strong>Target Calendar:</strong> ' + b.calendar_target +
+                '</div>' +
+                '<div class="booking-actions">' +
+                    '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Confirmed\')">Confirm</button>' +
+                    '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Completed\')">Complete</button>' +
+                    '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Cancelled\')">Cancel</button>' +
+                '</div>';
+            list.appendChild(item);
+        });
+    } else {
+        list.innerHTML = '<p style="font-size:13px; text-align:center; padding:20px; color:#64748b;">No bookings found.</p>';
+    }
+
+    if (typeof BX24 !== 'undefined' && BX24 !== null) {
+        try {
+            BX24.resizeWindow(document.body.scrollWidth, Math.max(document.body.scrollHeight, 650));
+        } catch(e) {}
+    }
 }
 
 function updateStatus(bookingId, status) {
@@ -254,7 +315,11 @@ function updateStatus(bookingId, status) {
     .then(function(res) { return res.json(); })
     .then(function(data) {
         if (data.status === 'success') {
-            loadEntityBookings();
+            if (placementInfo.entityId == 0) {
+                loadAllBookings();
+            } else {
+                loadEntityBookings();
+            }
             loadSlots();
         } else {
             alert('Error updating status: ' + data.message);
