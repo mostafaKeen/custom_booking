@@ -273,11 +273,27 @@ try {
 
             // Step 5: Sync to Native Online Booking (/booking/) via booking.v1.booking.add
             $b24NativeBookingId = 0;
-            $nativeRes = CRest::call('booking.v1.booking.add', [
-                'fields' => [
+            $resourceIds = [];
+            $resList = CRest::call('booking.v1.resource.list', []);
+            writeLog("STEP_5_RESOURCE_LIST_CHECK", $resList);
+
+            if (!empty($resList['result']['resources'])) {
+                foreach ($resList['result']['resources'] as $resItem) {
+                    if (!empty($resItem['id'])) {
+                        $resourceIds[] = (int)$resItem['id'];
+                        break; // Use first active resource
+                    }
+                }
+            }
+
+            if (!empty($resourceIds)) {
+                $nativeRes = CRest::call('booking.v1.booking.add', [
+                    'resourceIds' => $resourceIds,
+                    'datePeriod' => [
+                        'from' => date('Y-m-d\TH:i:sP', $startTs),
+                        'to' => date('Y-m-d\TH:i:sP', $endTs)
+                    ],
                     'name' => "{$serviceName} - {$clientName}",
-                    'dateFrom' => date('Y-m-d\TH:i:sP', $startTs),
-                    'dateTo' => date('Y-m-d\TH:i:sP', $endTs),
                     'notes' => $notes,
                     'clients' => [
                         [
@@ -288,12 +304,14 @@ try {
                             'email' => $clientEmail
                         ]
                     ]
-                ]
-            ]);
-            writeLog("STEP_5_BOOKING_V1_BOOKING_ADD", $nativeRes);
+                ]);
+                writeLog("STEP_5_BOOKING_V1_BOOKING_ADD", $nativeRes);
 
-            if (!empty($nativeRes['result']['id'])) {
-                $b24NativeBookingId = $nativeRes['result']['id'];
+                if (!empty($nativeRes['result']['id'])) {
+                    $b24NativeBookingId = $nativeRes['result']['id'];
+                }
+            } else {
+                writeLog("STEP_5_BOOKING_V1_BOOKING_ADD_SKIPPED", ['reason' => 'No active resourceIds found in Bitrix24 booking.v1.resource.list']);
             }
 
             // Update local DB with B24 IDs
