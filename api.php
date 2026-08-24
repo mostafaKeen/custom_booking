@@ -19,7 +19,25 @@ try {
         case 'get_services_and_staff':
             $services = $db->query("SELECT * FROM services ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
             $staff = $db->query("SELECT * FROM staff WHERE is_active = 1 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
-            sendJson(['status' => 'success', 'services' => $services, 'staff' => $staff]);
+            
+            // Optionally fetch native Bitrix24 online booking resources via REST API
+            $b24Resources = [];
+            $res = CRest::call('booking.v1.resource.list', []);
+            if (!empty($res['result']['resources'])) {
+                $b24Resources = $res['result']['resources'];
+            } else {
+                $res = CRest::call('calendar.resource.list', []);
+                if (!empty($res['result'])) {
+                    $b24Resources = $res['result'];
+                }
+            }
+
+            sendJson([
+                'status' => 'success',
+                'services' => $services,
+                'staff' => $staff,
+                'b24_resources' => $b24Resources
+            ]);
             break;
 
         case 'get_slots':
@@ -196,11 +214,32 @@ try {
             ]);
             $b24CalendarEventId = $calRes['result'] ?? 0;
 
+            // 5. Sync to Bitrix24 Native Online Booking Grid (/booking/) via booking.v1.booking.add
+            $b24NativeBookingId = 0;
+            $nativeRes = CRest::call('booking.v1.booking.add', [
+                'name' => "{$serviceName} - {$clientName}",
+                'dateFrom' => date('Y-m-d\TH:i:sP', $startTs),
+                'dateTo' => date('Y-m-d\TH:i:sP', $endTs),
+                'notes' => $notes,
+                'clients' => [
+                    [
+                        'type' => ($entityType === 'LEAD' ? 'CRM_LEAD' : 'CRM_DEAL'),
+                        'id' => $entityId,
+                        'name' => $clientName,
+                        'phone' => $clientPhone,
+                        'email' => $clientEmail
+                    ]
+                ]
+            ]);
+            if (!empty($nativeRes['result']['id'])) {
+                $b24NativeBookingId = $nativeRes['result']['id'];
+            }
+
             // Update booking record with B24 IDs
             $stmt = $db->prepare("UPDATE bookings SET b24_activity_id = ?, b24_calendar_event_id = ? WHERE id = ?");
             $stmt->execute([$b24ActivityId, $b24CalendarEventId, $bookingId]);
 
-            // 5. Send Notification to Staff (im.notification.add)
+            // 6. Send Notification to Staff (im.notification.add)
             if ($b24UserId > 0) {
                 CRest::call('im.notification.add', [
                     'TO' => $b24UserId,
@@ -213,7 +252,8 @@ try {
                 'message' => 'Booking created successfully!',
                 'booking_id' => $bookingId,
                 'activity_id' => $b24ActivityId,
-                'calendar_event_id' => $b24CalendarEventId
+                'calendar_event_id' => $b24CalendarEventId,
+                'native_booking_id' => $b24NativeBookingId
             ]);
             break;
 
