@@ -263,7 +263,21 @@ function renderBookingsList(data) {
             
             var crmBadge = '';
             if (b.entity_id > 0) {
-                crmBadge = '<span style="font-size:11px; font-weight:bold; background:#e2e8f0; color:#475569; padding:2px 6px; border-radius:4px; margin-right:6px;">' + b.entity_type + ': ' + b.entity_id + '</span>';
+                var domain = 'capitalwestern.bitrix24.com';
+                if (typeof BX24 !== 'undefined' && BX24 !== null) {
+                    try {
+                        var auth = BX24.getAuth();
+                        if (auth && auth.domain) {
+                            domain = auth.domain;
+                        }
+                    } catch(e) {}
+                }
+                var entityPath = b.entity_type.toLowerCase() === 'lead' ? 'lead' : 'deal';
+                var entityUrl = 'https://' + domain + '/crm/' + entityPath + '/details/' + b.entity_id + '/';
+                var displayTitle = b.entity_title || (b.entity_type + ' #' + b.entity_id);
+                crmBadge = '<a href="' + entityUrl + '" target="_blank" style="font-size:11px; font-weight:bold; background:#eff6ff; color:#2563eb; text-decoration:none; padding:3px 8px; border-radius:4px; border:1px solid #bfdbfe; margin-right:6px; display:inline-flex; align-items:center; gap:4px;">' + 
+                    '<svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg> ' +
+                    displayTitle + '</a>';
             }
 
             item.innerHTML =

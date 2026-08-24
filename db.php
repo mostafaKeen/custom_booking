@@ -84,6 +84,12 @@ class DB {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )");
 
+        try {
+            $db->exec("ALTER TABLE bookings ADD COLUMN entity_title VARCHAR(255) DEFAULT ''");
+        } catch (Exception $e) {
+            // Column already exists
+        }
+
         // Insert Default Services & Staff if empty
         $stmt = $db->query("SELECT COUNT(*) FROM services");
         if ($stmt->fetchColumn() == 0) {

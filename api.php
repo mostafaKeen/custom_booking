@@ -190,18 +190,10 @@ try {
             $staffName = $staff ? $staff['name'] : 'Specialist';
             $b24UserId = $staff ? (int)$staff['b24_user_id'] : 1;
 
-            // Step 1: Insert into local DB
-            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?)");
-            $stmt->execute([
-                $entityType, $entityId, $clientName, $clientPhone, $clientEmail,
-                $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes
-            ]);
-            $bookingId = $db->lastInsertId();
-            writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId]);
-
-            // Step 2: Fetch Entity owner & linked Contact in B24
+            // Step 1: Fetch Entity owner, Title & linked Contact in B24
             $ownerId = $b24UserId;
             $contactId = 0;
+            $entityTitle = '';
             if ($entityType === 'LEAD' && $entityId > 0) {
                 $leadRes = CRest::call('crm.lead.get', ['id' => $entityId]);
                 writeLog("STEP_2_CRM_LEAD_GET", $leadRes);
@@ -210,6 +202,9 @@ try {
                 }
                 if (!empty($leadRes['result']['CONTACT_ID'])) {
                     $contactId = (int)$leadRes['result']['CONTACT_ID'];
+                }
+                if (!empty($leadRes['result']['TITLE'])) {
+                    $entityTitle = $leadRes['result']['TITLE'];
                 }
             } elseif ($entityType === 'DEAL' && $entityId > 0) {
                 $dealRes = CRest::call('crm.deal.get', ['id' => $entityId]);
@@ -220,7 +215,23 @@ try {
                 if (!empty($dealRes['result']['CONTACT_ID'])) {
                     $contactId = (int)$dealRes['result']['CONTACT_ID'];
                 }
+                if (!empty($dealRes['result']['TITLE'])) {
+                    $entityTitle = $dealRes['result']['TITLE'];
+                }
             }
+
+            if (empty($entityTitle)) {
+                $entityTitle = ($entityType === 'LEAD' ? 'Lead' : 'Deal') . ' #' . $entityId;
+            }
+
+            // Step 2: Insert into local DB
+            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?)");
+            $stmt->execute([
+                $entityType, $entityId, $entityTitle, $clientName, $clientPhone, $clientEmail,
+                $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes
+            ]);
+            $bookingId = $db->lastInsertId();
+            writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId, 'entity_title' => $entityTitle]);
 
             // Step 3: Create CRM Activity (crm.activity.add) with COMMUNICATIONS
             $activitySubject = "Booking: {$serviceName} with {$staffName}";
