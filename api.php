@@ -201,7 +201,7 @@ try {
                 }
             }
 
-            // Step 3: Create CRM Activity (crm.activity.add)
+            // Step 3: Create CRM Activity (crm.activity.add) with COMMUNICATIONS
             $activitySubject = "Booking: {$serviceName} with {$staffName}";
             $activityDesc = "Appointment Details:\n"
                 . "Service: {$serviceName}\n"
@@ -211,24 +211,46 @@ try {
                 . "Notes: {$notes}";
 
             $bindings = [];
+            $communications = [];
+
             if ($entityType === 'LEAD') {
                 $bindings[] = ['OWNER_TYPE_ID' => 1, 'OWNER_ID' => $entityId];
+                if (!empty($clientPhone)) {
+                    $communications[] = [
+                        'VALUE' => $clientPhone,
+                        'ENTITY_TYPE_ID' => 1,
+                        'ENTITY_ID' => $entityId,
+                        'TYPE' => 'PHONE'
+                    ];
+                }
             } else {
                 $bindings[] = ['OWNER_TYPE_ID' => 2, 'OWNER_ID' => $entityId];
+                if (!empty($clientPhone)) {
+                    $communications[] = [
+                        'VALUE' => $clientPhone,
+                        'ENTITY_TYPE_ID' => 2,
+                        'ENTITY_ID' => $entityId,
+                        'TYPE' => 'PHONE'
+                    ];
+                }
             }
 
-            $activityRes = CRest::call('crm.activity.add', [
-                'fields' => [
-                    'SUBJECT' => $activitySubject,
-                    'DESCRIPTION' => $activityDesc,
-                    'START_TIME' => date('c', $startTs),
-                    'END_TIME' => date('c', $endTs),
-                    'COMPLETED' => 'N',
-                    'RESPONSIBLE_ID' => $ownerId,
-                    'BINDINGS' => $bindings,
-                    'TYPE_ID' => 2, // Meeting
-                ]
-            ]);
+            $activityFields = [
+                'SUBJECT' => $activitySubject,
+                'DESCRIPTION' => $activityDesc,
+                'START_TIME' => date('c', $startTs),
+                'END_TIME' => date('c', $endTs),
+                'COMPLETED' => 'N',
+                'RESPONSIBLE_ID' => $ownerId,
+                'BINDINGS' => $bindings,
+                'TYPE_ID' => 2, // Meeting
+            ];
+
+            if (!empty($communications)) {
+                $activityFields['COMMUNICATIONS'] = $communications;
+            }
+
+            $activityRes = CRest::call('crm.activity.add', ['fields' => $activityFields]);
             writeLog("STEP_3_CRM_ACTIVITY_ADD", $activityRes);
             $b24ActivityId = $activityRes['result'] ?? 0;
 
@@ -252,17 +274,19 @@ try {
             // Step 5: Sync to Native Online Booking (/booking/) via booking.v1.booking.add
             $b24NativeBookingId = 0;
             $nativeRes = CRest::call('booking.v1.booking.add', [
-                'name' => "{$serviceName} - {$clientName}",
-                'dateFrom' => date('Y-m-d\TH:i:sP', $startTs),
-                'dateTo' => date('Y-m-d\TH:i:sP', $endTs),
-                'notes' => $notes,
-                'clients' => [
-                    [
-                        'type' => ($entityType === 'LEAD' ? 'CRM_LEAD' : 'CRM_DEAL'),
-                        'id' => $entityId,
-                        'name' => $clientName,
-                        'phone' => $clientPhone,
-                        'email' => $clientEmail
+                'fields' => [
+                    'name' => "{$serviceName} - {$clientName}",
+                    'dateFrom' => date('Y-m-d\TH:i:sP', $startTs),
+                    'dateTo' => date('Y-m-d\TH:i:sP', $endTs),
+                    'notes' => $notes,
+                    'clients' => [
+                        [
+                            'type' => ($entityType === 'LEAD' ? 'CRM_LEAD' : 'CRM_DEAL'),
+                            'id' => $entityId,
+                            'name' => $clientName,
+                            'phone' => $clientPhone,
+                            'email' => $clientEmail
+                        ]
                     ]
                 ]
             ]);
@@ -272,7 +296,7 @@ try {
                 $b24NativeBookingId = $nativeRes['result']['id'];
             }
 
-            // Update local DB
+            // Update local DB with B24 IDs
             $stmt = $db->prepare("UPDATE bookings SET b24_activity_id = ?, b24_calendar_event_id = ? WHERE id = ?");
             $stmt->execute([$b24ActivityId, $b24CalendarEventId, $bookingId]);
 
@@ -282,12 +306,6 @@ try {
                     'USER_ID' => $b24UserId,
                     'MESSAGE' => "New Booking Scheduled: {$serviceName} for {$clientName} on {$bookingDate} at " . date('h:i A', $startTs)
                 ]);
-                if (isset($notifRes['error'])) {
-                    $notifRes = CRest::call('im.notify.personal.add', [
-                        'USER_ID' => $b24UserId,
-                        'MESSAGE' => "New Booking Scheduled: {$serviceName} for {$clientName} on {$bookingDate} at " . date('h:i A', $startTs)
-                    ]);
-                }
                 writeLog("STEP_6_IM_NOTIFICATION_ADD", $notifRes);
             }
 
