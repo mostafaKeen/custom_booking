@@ -244,6 +244,14 @@ function loadEntityBookings() {
     fetch('api.php?action=get_entity_bookings&entity_type=' + placementInfo.entityType + '&entity_id=' + placementInfo.entityId + getAuthParams())
         .then(function(res) { return res.json(); })
         .then(function(data) {
+            if (data.status === 'success') {
+                if (data.client_name && !document.getElementById('client_name').value) {
+                    document.getElementById('client_name').value = data.client_name;
+                }
+                if (data.client_phone && !document.getElementById('client_phone').value) {
+                    document.getElementById('client_phone').value = data.client_phone;
+                }
+            }
             renderBookingsList(data);
         })
         .catch(function(err) {

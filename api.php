@@ -143,7 +143,41 @@ try {
             $stmt->execute([$entityType, $entityId]);
             $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            sendJson(['status' => 'success', 'bookings' => $bookings]);
+            // Auto-fetch client name & phone from Lead or Deal Contact
+            $clientName = '';
+            $clientPhone = '';
+
+            if ($entityId > 0) {
+                if ($entityType === 'LEAD') {
+                    $crmRes = CRest::call('crm.lead.get', ['id' => $entityId]);
+                    if (!empty($crmRes['result'])) {
+                        $clientName = trim(($crmRes['result']['NAME'] ?? '') . ' ' . ($crmRes['result']['LAST_NAME'] ?? ''));
+                        if (!empty($crmRes['result']['PHONE']) && is_array($crmRes['result']['PHONE'])) {
+                            $clientPhone = $crmRes['result']['PHONE'][0]['VALUE'] ?? '';
+                        }
+                    }
+                } elseif ($entityType === 'DEAL') {
+                    $crmRes = CRest::call('crm.deal.get', ['id' => $entityId]);
+                    if (!empty($crmRes['result'])) {
+                        if (!empty($crmRes['result']['CONTACT_ID'])) {
+                            $contactRes = CRest::call('crm.contact.get', ['id' => $crmRes['result']['CONTACT_ID']]);
+                            if (!empty($contactRes['result'])) {
+                                $clientName = trim(($contactRes['result']['NAME'] ?? '') . ' ' . ($contactRes['result']['LAST_NAME'] ?? ''));
+                                if (!empty($contactRes['result']['PHONE']) && is_array($contactRes['result']['PHONE'])) {
+                                    $clientPhone = $contactRes['result']['PHONE'][0]['VALUE'] ?? '';
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            sendJson([
+                'status' => 'success', 
+                'bookings' => $bookings,
+                'client_name' => $clientName,
+                'client_phone' => $clientPhone
+            ]);
             break;
 
         case 'create_booking':
@@ -151,7 +185,22 @@ try {
             $entityId = (int)($_REQUEST['entity_id'] ?? 0);
             $serviceId = (int)($_REQUEST['service_id'] ?? 0);
             $staffId = (int)($_REQUEST['staff_id'] ?? 0);
-            $b24ResourceId = (int)($_REQUEST['b24_resource_id'] ?? 0);
+            
+            // Handle multiple resources input
+            $b24ResourceIdInput = $_REQUEST['b24_resource_id'] ?? [];
+            $resourceIds = [];
+            if (is_array($b24ResourceIdInput)) {
+                foreach ($b24ResourceIdInput as $resId) {
+                    if ((int)$resId > 0) {
+                        $resourceIds[] = (int)$resId;
+                    }
+                }
+            } else {
+                if ((int)$b24ResourceIdInput > 0) {
+                    $resourceIds[] = (int)$b24ResourceIdInput;
+                }
+            }
+
             $bookingDate = $_REQUEST['booking_date'] ?? date('Y-m-d');
             $startTime = $_REQUEST['start_time'] ?? '09:00:00';
             $calendarTarget = $_REQUEST['calendar_target'] ?? 'responsible';
@@ -165,7 +214,7 @@ try {
                 'entityId' => $entityId,
                 'serviceId' => $serviceId,
                 'staffId' => $staffId,
-                'b24ResourceId' => $b24ResourceId,
+                'resourceIds' => $resourceIds,
                 'bookingDate' => $bookingDate,
                 'startTime' => $startTime,
                 'calendarTarget' => $calendarTarget,
@@ -206,6 +255,13 @@ try {
                 if (!empty($leadRes['result']['TITLE'])) {
                     $entityTitle = $leadRes['result']['TITLE'];
                 }
+                // Auto fill client details if empty
+                if (empty($clientName)) {
+                    $clientName = trim(($leadRes['result']['NAME'] ?? '') . ' ' . ($leadRes['result']['LAST_NAME'] ?? ''));
+                }
+                if (empty($clientPhone) && !empty($leadRes['result']['PHONE']) && is_array($leadRes['result']['PHONE'])) {
+                    $clientPhone = $leadRes['result']['PHONE'][0]['VALUE'] ?? '';
+                }
             } elseif ($entityType === 'DEAL' && $entityId > 0) {
                 $dealRes = CRest::call('crm.deal.get', ['id' => $entityId]);
                 writeLog("STEP_2_CRM_DEAL_GET", $dealRes);
@@ -217,6 +273,15 @@ try {
                 }
                 if (!empty($dealRes['result']['TITLE'])) {
                     $entityTitle = $dealRes['result']['TITLE'];
+                }
+                if ($contactId > 0) {
+                    $contactRes = CRest::call('crm.contact.get', ['id' => $contactId]);
+                    if (empty($clientName) && !empty($contactRes['result'])) {
+                        $clientName = trim(($contactRes['result']['NAME'] ?? '') . ' ' . ($contactRes['result']['LAST_NAME'] ?? ''));
+                    }
+                    if (empty($clientPhone) && !empty($contactRes['result']['PHONE']) && is_array($contactRes['result']['PHONE'])) {
+                        $clientPhone = $contactRes['result']['PHONE'][0]['VALUE'] ?? '';
+                    }
                 }
             }
 
@@ -286,30 +351,29 @@ try {
             writeLog("STEP_3_CRM_ACTIVITY_ADD", $activityRes);
             $b24ActivityId = $activityRes['result'] ?? 0;
 
-            // Step 4: Create Calendar Event (calendar.event.add)
+            // Step 4: Create Calendar Event - PUBLIC and visible to all users (company_calendar)
             $b24CalendarEventId = 0;
-            $targetOwner = ($calendarTarget === 'shared') ? DEFAULT_SHARED_CALENDAR_ID : $ownerId;
+            $crmLink = ($entityType === 'LEAD') ? "L_" . $entityId : "D_" . $entityId;
 
             $calRes = CRest::call('calendar.event.add', [
-                'type' => 'user',
-                'ownerId' => $targetOwner,
+                'type' => 'company_calendar',
+                'ownerId' => 0,
                 'name' => "Appointment: {$serviceName} - {$clientName}",
                 'description' => $activityDesc,
                 'from' => date('d.m.Y H:i:s', $startTs),
                 'to' => date('d.m.Y H:i:s', $endTs),
                 'skip_time' => 'N',
-                'section' => 0
+                'section' => 0,
+                'private_event' => 'N',
+                'crm_fields' => [$crmLink]
             ]);
             writeLog("STEP_4_CALENDAR_EVENT_ADD", $calRes);
             $b24CalendarEventId = $calRes['result'] ?? 0;
 
             // Step 5: Sync to Native Online Booking (/booking/) via booking.v1.booking.add
             $b24NativeBookingId = 0;
-            $resourceIds = [];
 
-            if ($b24ResourceId > 0) {
-                $resourceIds[] = $b24ResourceId;
-            } else {
+            if (empty($resourceIds)) {
                 // Fallback to fetch first active resource
                 $resList = CRest::call('booking.v1.resource.list', []);
                 writeLog("STEP_5_RESOURCE_LIST_CHECK", $resList);

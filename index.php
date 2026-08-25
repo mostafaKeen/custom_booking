@@ -48,10 +48,11 @@ header('Content-Security-Policy: frame-ancestors *');
                     </div>
 
                     <div class="form-group">
-                        <label for="b24_resource_id">Bitrix24 Booking Resource</label>
-                        <select id="b24_resource_id" name="b24_resource_id" class="form-control" required>
+                        <label for="b24_resource_id">Bitrix24 Booking Resource(s)</label>
+                        <select id="b24_resource_id" name="b24_resource_id[]" class="form-control" required multiple style="height: 85px; padding: 6px;">
                             <!-- Dynamically loaded resources from Bitrix24 -->
                         </select>
+                        <small style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Hold Ctrl / Cmd to select multiple.</small>
                     </div>
 
                     <div class="form-group">
