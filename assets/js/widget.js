@@ -423,19 +423,20 @@ function placeEventCards(columns, timeSlots) {
             var widthPercent = 100 / ev.totalSubCols;
             var leftPercent = widthPercent * ev.subColIndex;
 
-            eventEl.style.top = ev.topPx + 'px';
-            eventEl.style.height = ev.heightPx + 'px';
+            eventEl.style.top = (ev.topPx + 1) + 'px';
+            eventEl.style.height = Math.max(22, ev.heightPx - 2) + 'px';
             eventEl.style.width = 'calc(' + widthPercent + '% - 4px)';
             eventEl.style.left = 'calc(' + leftPercent + '% + 2px)';
+            eventEl.style.boxSizing = 'border-box';
+            eventEl.style.background = '#ffffff';
             eventEl.style.borderLeftColor = serviceColor;
-            eventEl.style.background = hexToRgba(serviceColor, 0.08);
-            eventEl.style.color = serviceColor;
+            eventEl.style.color = '#1e293b';
 
             var clientDisplay = booking.client_name || 'N/A';
             var createdBy = booking.created_by_name || '';
 
             eventEl.innerHTML =
-                '<div class="cal-event-title" style="font-weight: 700;">' + escapeHtml(booking.service_name || 'Booking') + '</div>' +
+                '<div class="cal-event-title" style="font-weight: 700; color:' + serviceColor + ';">' + escapeHtml(booking.service_name || 'Booking') + '</div>' +
                 '<div class="cal-event-time" style="font-weight: 500;">' + formatTime12(booking.start_time) + ' – ' + formatTime12(booking.end_time) + '</div>' +
                 '<div class="cal-event-client">👤 ' + escapeHtml(clientDisplay) + '</div>' +
                 (createdBy ? '<div class="cal-event-staff">By: ' + escapeHtml(createdBy) + '</div>' : '') +
@@ -657,11 +658,52 @@ function loadServicesAndStaff() {
 
                 document.getElementById('booking_date').value = new Date().toISOString().split('T')[0];
                 loadSlots();
+                handleCarReservationRules();
             }
         })
         .catch(function(err) {
             console.error('Failed to load services/staff:', err);
         });
+}
+
+function handleCarReservationRules() {
+    var resourceSelect = document.getElementById('b24_resource_id');
+    var carSelect = document.getElementById('ufCrm29_1787324769682');
+    if (!resourceSelect || !carSelect) return;
+
+    var isDriverSelected = false;
+    for (var i = 0; i < resourceSelect.options.length; i++) {
+        var opt = resourceSelect.options[i];
+        if (opt.selected && opt.text.toLowerCase().indexOf('driver') >= 0) {
+            isDriverSelected = true;
+            break;
+        }
+    }
+
+    var noCarOpt = carSelect.querySelector('option[value="707"]');
+    var car1Opt = carSelect.querySelector('option[value="709"]');
+    var car2Opt = carSelect.querySelector('option[value="711"]');
+    var car3Opt = carSelect.querySelector('option[value="713"]');
+
+    if (isDriverSelected) {
+        // Forced to choose Car 1, Car 2, or Car 3
+        if (noCarOpt) noCarOpt.disabled = true;
+        if (car1Opt) car1Opt.disabled = false;
+        if (car2Opt) car2Opt.disabled = false;
+        if (car3Opt) car3Opt.disabled = false;
+
+        if (carSelect.value === '707' || !carSelect.value) {
+            carSelect.value = '709'; // Default to Car 1
+        }
+    } else {
+        // Forced to choose No Car
+        if (noCarOpt) noCarOpt.disabled = false;
+        if (car1Opt) car1Opt.disabled = true;
+        if (car2Opt) car2Opt.disabled = true;
+        if (car3Opt) car3Opt.disabled = true;
+
+        carSelect.value = '707'; // Default to No Car
+    }
 }
 
 function loadSlots() {
@@ -710,10 +752,35 @@ function setupEventListeners() {
     document.getElementById('staff_id').addEventListener('change', loadSlots);
     document.getElementById('booking_date').addEventListener('change', loadSlots);
 
+    var b24ResSelect = document.getElementById('b24_resource_id');
+    if (b24ResSelect) {
+        b24ResSelect.addEventListener('change', handleCarReservationRules);
+    }
+
     document.getElementById('booking_form').addEventListener('submit', function(e) {
         e.preventDefault();
         if (!selectedSlot) {
             alert('Please select an available time slot.');
+            return;
+        }
+
+        // Validate Car Selection rules
+        var carVal = document.getElementById('ufCrm29_1787324769682').value;
+        var resSelect = document.getElementById('b24_resource_id');
+        var isDriverSelected = false;
+        for (var i = 0; i < resSelect.options.length; i++) {
+            if (resSelect.options[i].selected && resSelect.options[i].text.toLowerCase().indexOf('driver') >= 0) {
+                isDriverSelected = true;
+                break;
+            }
+        }
+
+        if (isDriverSelected && carVal === '707') {
+            alert('When "Driver" is selected, you must choose Car 1, Car 2, or Car 3.');
+            return;
+        }
+        if (!isDriverSelected && carVal !== '707') {
+            alert('Car reservation (Car 1/2/3) is only permitted when "Driver" is selected.');
             return;
         }
 

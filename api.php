@@ -370,6 +370,12 @@ try {
                         }
                     }
                 }
+            // Enforce Car Reservation business rule
+            $isDriverSelected = in_array(699, $resourcesList);
+            if ($isDriverSelected && (int)$carReserved == 707) {
+                $carReserved = 709; // Default to Car 1
+            } elseif (!$isDriverSelected) {
+                $carReserved = 707; // Force No Car
             }
 
             // Step 2: Insert into local DB
