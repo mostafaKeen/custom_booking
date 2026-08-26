@@ -58,9 +58,8 @@ header('Content-Security-Policy: frame-ancestors *');
                     <div class="form-group">
                         <label for="calendar_target">Calendar Destination Sync</label>
                         <select id="calendar_target" name="calendar_target" class="form-control">
-                            <option value="responsible">Lead/Deal Responsible Agent's Calendar</option>
-                            <option value="shared">Shared Company / Department Calendar</option>
-                            <option value="native_resource">Bitrix24 Native Resource Booking</option>
+                            <option value="user">My Calendar</option>
+                            <option value="company_calendar">Public (Company Calendar)</option>
                         </select>
                     </div>
 

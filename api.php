@@ -203,7 +203,7 @@ try {
 
             $bookingDate = $_REQUEST['booking_date'] ?? date('Y-m-d');
             $startTime = $_REQUEST['start_time'] ?? '09:00:00';
-            $calendarTarget = $_REQUEST['calendar_target'] ?? 'responsible';
+            $calendarTarget = $_REQUEST['calendar_target'] ?? 'user';
             $clientName = trim($_REQUEST['client_name'] ?? '');
             $clientPhone = trim($_REQUEST['client_phone'] ?? '');
             $clientEmail = trim($_REQUEST['client_email'] ?? '');
@@ -351,22 +351,51 @@ try {
             writeLog("STEP_3_CRM_ACTIVITY_ADD", $activityRes);
             $b24ActivityId = $activityRes['result'] ?? 0;
 
-            // Step 4: Create Calendar Event - PUBLIC and visible to all users (company_calendar)
+            // Step 4: Create Calendar Event (user calendar or company calendar)
             $b24CalendarEventId = 0;
             $crmLink = ($entityType === 'LEAD') ? "L_" . $entityId : "D_" . $entityId;
 
-            $calRes = CRest::call('calendar.event.add', [
-                'type' => 'company_calendar',
-                'ownerId' => 0,
+            // Determine calendar type and owner ID based on target
+            if ($calendarTarget === 'user') {
+                $calType = 'user';
+                $currentUserRes = CRest::call('user.current', []);
+                writeLog("STEP_4_USER_CURRENT", $currentUserRes);
+                $calOwnerId = !empty($currentUserRes['result']['ID']) ? (int)$currentUserRes['result']['ID'] : $ownerId;
+            } else {
+                $calType = 'company_calendar';
+                $calOwnerId = 0;
+            }
+
+            // Retrieve section ID dynamically to avoid permission/invalid section issues
+            $calSectionId = 0;
+            $sectionsRes = CRest::call('calendar.section.get', [
+                'type' => $calType,
+                'ownerId' => $calOwnerId
+            ]);
+            writeLog("STEP_4_CALENDAR_SECTION_GET", $sectionsRes);
+            if (!empty($sectionsRes['result']) && is_array($sectionsRes['result'])) {
+                $calSectionId = (int)$sectionsRes['result'][0]['ID'];
+            }
+
+            $eventParams = [
+                'type' => $calType,
+                'ownerId' => $calOwnerId,
                 'name' => "Appointment: {$serviceName} - {$clientName}",
                 'description' => $activityDesc,
                 'from' => date('d.m.Y H:i:s', $startTs),
                 'to' => date('d.m.Y H:i:s', $endTs),
                 'skip_time' => 'N',
-                'section' => 0,
                 'private_event' => 'N',
                 'crm_fields' => [$crmLink]
-            ]);
+            ];
+
+            if ($calSectionId > 0) {
+                $eventParams['section'] = $calSectionId;
+            } else {
+                $eventParams['auto_detect_section'] = 'Y';
+            }
+
+            $calRes = CRest::call('calendar.event.add', $eventParams);
             writeLog("STEP_4_CALENDAR_EVENT_ADD", $calRes);
             $b24CalendarEventId = $calRes['result'] ?? 0;
 
