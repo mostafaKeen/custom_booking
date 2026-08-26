@@ -64,6 +64,35 @@ header('Content-Security-Policy: frame-ancestors *');
                     </div>
 
                     <div class="form-group">
+                        <label for="ufCrm29_1787324188722">Booking Type *</label>
+                        <select id="ufCrm29_1787324188722" name="ufCrm29_1787324188722[]" class="form-control" required multiple style="height: 75px; padding: 6px;">
+                            <option value="685">Resource</option>
+                            <option value="687">Viewing</option>
+                            <option value="689">Meeting</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ufCrm29_1787324656">Resources *</label>
+                        <select id="ufCrm29_1787324656" name="ufCrm29_1787324656[]" class="form-control" required multiple style="height: 85px; padding: 6px;">
+                            <option value="699">Driver</option>
+                            <option value="701">Meeting Room</option>
+                            <option value="703">Photo Grapher</option>
+                            <option value="705">Video Grapher</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ufCrm29_1787324769682">Car Reserved *</label>
+                        <select id="ufCrm29_1787324769682" name="ufCrm29_1787324769682" class="form-control" required>
+                            <option value="707">No Car</option>
+                            <option value="709">Car 1</option>
+                            <option value="711">Car 2</option>
+                            <option value="713">Car 3</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label for="booking_date">Appointment Date</label>
                         <input type="date" id="booking_date" name="booking_date" class="form-control" required>
                     </div>

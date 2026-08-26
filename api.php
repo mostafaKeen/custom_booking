@@ -289,11 +289,19 @@ try {
                 $entityTitle = ($entityType === 'LEAD' ? 'Lead' : 'Deal') . ' #' . $entityId;
             }
 
+            // Retrieve custom fields from request
+            $bookingType = $_REQUEST['ufCrm29_1787324188722'] ?? [];
+            $resourcesList = $_REQUEST['ufCrm29_1787324656'] ?? [];
+            $carReserved = $_REQUEST['ufCrm29_1787324769682'] ?? '';
+
             // Step 2: Insert into local DB
-            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?)");
+            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1787324769682) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $entityType, $entityId, $entityTitle, $clientName, $clientPhone, $clientEmail,
-                $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes
+                $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes,
+                is_array($bookingType) ? implode(',', $bookingType) : $bookingType,
+                is_array($resourcesList) ? implode(',', $resourcesList) : $resourcesList,
+                (int)$carReserved
             ]);
             $bookingId = $db->lastInsertId();
             writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId, 'entity_title' => $entityTitle]);
@@ -493,6 +501,23 @@ try {
                 $spaFields['parentId1'] = $entityId;
             } elseif ($entityType === 'DEAL') {
                 $spaFields['parentId2'] = $entityId;
+            }
+
+            // Map custom fields to correct dynamic types (enumerations/integer arrays/integers)
+            if (is_array($bookingType)) {
+                $spaFields['ufCrm29_1787324188722'] = array_map('intval', $bookingType);
+            } elseif (!empty($bookingType)) {
+                $spaFields['ufCrm29_1787324188722'] = [intval($bookingType)];
+            }
+
+            if (is_array($resourcesList)) {
+                $spaFields['ufCrm29_1787324656'] = array_map('intval', $resourcesList);
+            } elseif (!empty($resourcesList)) {
+                $spaFields['ufCrm29_1787324656'] = [intval($resourcesList)];
+            }
+
+            if (!empty($carReserved)) {
+                $spaFields['ufCrm29_1787324769682'] = intval($carReserved);
             }
 
             $spaRes = CRest::call('crm.item.add', [

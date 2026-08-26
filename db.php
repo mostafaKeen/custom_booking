@@ -96,6 +96,18 @@ class DB {
             // Column already exists
         }
 
+        try {
+            $db->exec("ALTER TABLE bookings ADD COLUMN ufCrm29_1787324188722 VARCHAR(255) DEFAULT ''");
+        } catch (Exception $e) {}
+
+        try {
+            $db->exec("ALTER TABLE bookings ADD COLUMN ufCrm29_1787324656 VARCHAR(255) DEFAULT ''");
+        } catch (Exception $e) {}
+
+        try {
+            $db->exec("ALTER TABLE bookings ADD COLUMN ufCrm29_1787324769682 INT DEFAULT 0");
+        } catch (Exception $e) {}
+
         // Insert Default Services & Staff if empty
         $stmt = $db->query("SELECT COUNT(*) FROM services");
         if ($stmt->fetchColumn() == 0) {
