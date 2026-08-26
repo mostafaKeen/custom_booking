@@ -370,6 +370,8 @@ try {
                         }
                     }
                 }
+            }
+
             // Enforce Car Reservation business rule
             $isDriverSelected = in_array(699, $resourcesList);
             if ($isDriverSelected && (int)$carReserved == 707) {
