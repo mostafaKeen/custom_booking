@@ -287,11 +287,16 @@ function renderCalendarGrid() {
 }
 
 function placeEventCards(columns, timeSlots) {
+    // Map column index to list of booking events placed in it
+    var colEventsMap = {};
+    columns.forEach(function(col, colIndex) {
+        colEventsMap[colIndex] = [];
+    });
+
     calBookings.forEach(function(booking) {
         // Determine which resource column(s) this booking belongs to
         var bookingResourceIds = [];
         if (booking.ufCrm29_1787324656) {
-            // This field stores the SPA resource IDs (comma-separated)
             bookingResourceIds = String(booking.ufCrm29_1787324656).split(',').map(function(s) { return s.trim(); });
         }
 
@@ -301,14 +306,11 @@ function placeEventCards(columns, timeSlots) {
             var colId = String(col.id);
             var colName = col.name.toLowerCase();
 
-            // Check by resource ID match
             if (bookingResourceIds.indexOf(colId) >= 0) {
                 matchedColumns.push(colIndex);
                 return;
             }
 
-            // Check by name match against the B24 resource IDs
-            // SPA mapping: driver=699, meeting room=701, photo grapher=703, video grapher=705
             var spaMap = { '699': ['driver'], '701': ['meeting room'], '703': ['photo grapher', 'photographer'], '705': ['video grapher', 'videographer'] };
             bookingResourceIds.forEach(function(resId) {
                 if (spaMap[resId]) {
@@ -323,18 +325,11 @@ function placeEventCards(columns, timeSlots) {
             });
         });
 
-        // If no match found, try to match by the actual B24 resource IDs stored in form
-        if (matchedColumns.length === 0 && bookingResourceIds.length > 0) {
-            // Place in first column as fallback
-            matchedColumns.push(0);
-        }
-
-        // If still no resource at all, skip (or place in first column)
         if (matchedColumns.length === 0) {
             matchedColumns.push(0);
         }
 
-        // Calculate row position
+        // Calculate time details
         var startParts = booking.start_time.split(':');
         var endParts = booking.end_time.split(':');
         var startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1], 10);
@@ -347,42 +342,110 @@ function placeEventCards(columns, timeSlots) {
         var heightPx = ((endMinutes - startMinutes) / 30) * slotHeight;
         if (heightPx < 24) heightPx = 24;
 
-        // Get color
-        var serviceColor = booking.service_color || '#3b82f6';
-        var statusInfo = SPA_STAGES[booking.status] || { name: booking.status, color: '#64748b' };
-
         matchedColumns.forEach(function(colIndex) {
-            // Find the first cell in this column to append to
-            var cellId = 'cell_0_' + colIndex;
-            var cell = document.getElementById(cellId);
-            if (!cell) return;
+            colEventsMap[colIndex].push({
+                booking: booking,
+                start_minutes: startMinutes,
+                end_minutes: endMinutes,
+                topPx: topPx,
+                heightPx: heightPx
+            });
+        });
+    });
+
+    // Render columns side-by-side if there are overlaps
+    columns.forEach(function(col, colIndex) {
+        var events = colEventsMap[colIndex] || [];
+        if (events.length === 0) return;
+
+        // Sort events by start time
+        events.sort(function(a, b) { return a.start_minutes - b.start_minutes; });
+
+        // Group into overlapping clusters
+        var clusters = [];
+        events.forEach(function(ev) {
+            var placed = false;
+            for (var i = 0; i < clusters.length; i++) {
+                var cluster = clusters[i];
+                var overlaps = cluster.some(function(item) {
+                    return ev.start_minutes < item.end_minutes && ev.end_minutes > item.start_minutes;
+                });
+                if (overlaps) {
+                    cluster.push(ev);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                clusters.push([ev]);
+            }
+        });
+
+        // For each cluster, calculate columns layout (sub-columns)
+        clusters.forEach(function(cluster) {
+            var subCols = []; // Stores end minutes of events in each sub-column
+            cluster.forEach(function(ev) {
+                var assignedIndex = -1;
+                for (var i = 0; i < subCols.length; i++) {
+                    if (ev.start_minutes >= subCols[i]) {
+                        assignedIndex = i;
+                        subCols[i] = ev.end_minutes;
+                        break;
+                    }
+                }
+                if (assignedIndex === -1) {
+                    subCols.push(ev.end_minutes);
+                    assignedIndex = subCols.length - 1;
+                }
+                ev.subColIndex = assignedIndex;
+            });
+
+            cluster.forEach(function(ev) {
+                ev.totalSubCols = subCols.length;
+            });
+        });
+
+        // Add to DOM
+        var cellId = 'cell_0_' + colIndex;
+        var cell = document.getElementById(cellId);
+        if (!cell) return;
+        cell.style.position = 'relative';
+
+        events.forEach(function(ev) {
+            var booking = ev.booking;
+            var serviceColor = booking.service_color || '#3b82f6';
+            var statusInfo = SPA_STAGES[booking.status] || { name: booking.status, color: '#64748b' };
 
             var eventEl = document.createElement('div');
             eventEl.className = 'cal-event';
-            eventEl.style.top = topPx + 'px';
-            eventEl.style.height = heightPx + 'px';
+            
+            // Layout calculations
+            var widthPercent = 100 / ev.totalSubCols;
+            var leftPercent = widthPercent * ev.subColIndex;
+
+            eventEl.style.top = ev.topPx + 'px';
+            eventEl.style.height = ev.heightPx + 'px';
+            eventEl.style.width = 'calc(' + widthPercent + '% - 4px)';
+            eventEl.style.left = 'calc(' + leftPercent + '% + 2px)';
             eventEl.style.borderLeftColor = serviceColor;
             eventEl.style.background = hexToRgba(serviceColor, 0.08);
             eventEl.style.color = serviceColor;
 
             var clientDisplay = booking.client_name || 'N/A';
-            var staffDisplay = booking.staff_name || '';
             var createdBy = booking.created_by_name || '';
 
             eventEl.innerHTML =
-                '<div class="cal-event-title">' + escapeHtml(booking.service_name || 'Booking') + '</div>' +
-                '<div class="cal-event-time">' + formatTime12(booking.start_time) + ' – ' + formatTime12(booking.end_time) + '</div>' +
+                '<div class="cal-event-title" style="font-weight: 700;">' + escapeHtml(booking.service_name || 'Booking') + '</div>' +
+                '<div class="cal-event-time" style="font-weight: 500;">' + formatTime12(booking.start_time) + ' – ' + formatTime12(booking.end_time) + '</div>' +
                 '<div class="cal-event-client">👤 ' + escapeHtml(clientDisplay) + '</div>' +
                 (createdBy ? '<div class="cal-event-staff">By: ' + escapeHtml(createdBy) + '</div>' : '') +
-                '<div style="margin-top:2px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + statusInfo.color + ';margin-right:3px;"></span><span style="font-size:8px;opacity:0.6;">' + escapeHtml(statusInfo.name) + '</span></div>';
+                '<div style="margin-top:2px; display:flex; align-items:center; gap:3px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + statusInfo.color + ';"></span><span style="font-size:8px;opacity:0.8;font-weight:600;">' + escapeHtml(statusInfo.name) + '</span></div>';
 
             eventEl.onclick = function(e) {
                 e.stopPropagation();
                 showEventPopup(booking);
             };
 
-            // Append to the column's first row cell, positioned absolutely
-            cell.style.position = 'relative';
             cell.appendChild(eventEl);
         });
     });
