@@ -48,7 +48,7 @@ header('Content-Security-Policy: frame-ancestors *');
                     </div>
 
                     <div class="form-group">
-                        <label for="b24_resource_id">Bitrix24 Booking Resource(s)</label>
+                        <label for="b24_resource_id">Bitrix24 Booking Resource(s) *</label>
                         <select id="b24_resource_id" name="b24_resource_id[]" class="form-control" required multiple style="height: 85px; padding: 6px;">
                             <!-- Dynamically loaded resources from Bitrix24 -->
                         </select>
@@ -69,16 +69,6 @@ header('Content-Security-Policy: frame-ancestors *');
                             <option value="685">Resource</option>
                             <option value="687">Viewing</option>
                             <option value="689">Meeting</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="ufCrm29_1787324656">Resources *</label>
-                        <select id="ufCrm29_1787324656" name="ufCrm29_1787324656[]" class="form-control" required multiple style="height: 85px; padding: 6px;">
-                            <option value="699">Driver</option>
-                            <option value="701">Meeting Room</option>
-                            <option value="703">Photo Grapher</option>
-                            <option value="705">Video Grapher</option>
                         </select>
                     </div>
 

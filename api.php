@@ -291,8 +291,39 @@ try {
 
             // Retrieve custom fields from request
             $bookingType = $_REQUEST['ufCrm29_1787324188722'] ?? [];
-            $resourcesList = $_REQUEST['ufCrm29_1787324656'] ?? [];
             $carReserved = $_REQUEST['ufCrm29_1787324769682'] ?? '';
+
+            // Resolve dynamic B24 resources to the SPA Resources mapping
+            $resourcesList = [];
+            if (!empty($resourceIds)) {
+                $resList = CRest::call('booking.v1.resource.list', []);
+                $resourceArray = $resList['result']['resource'] ?? ($resList['result']['resources'] ?? ($resList['result'] ?? []));
+                if (!is_array($resourceArray) || empty($resourceArray)) {
+                    $resCal = CRest::call('calendar.resource.list', []);
+                    $resourceArray = $resCal['result'] ?? [];
+                }
+                
+                $spaResourceMapping = [
+                    'driver' => 699,
+                    'meeting room' => 701,
+                    'photo grapher' => 703,
+                    'photographer' => 703,
+                    'video grapher' => 705,
+                    'videographer' => 705
+                ];
+
+                if (is_array($resourceArray)) {
+                    foreach ($resourceArray as $resItem) {
+                        $rId = (int)($resItem['id'] ?? ($resItem['ID'] ?? 0));
+                        if (in_array($rId, $resourceIds)) {
+                            $resName = strtolower(trim($resItem['name'] ?? ($resItem['NAME'] ?? '')));
+                            if (isset($spaResourceMapping[$resName])) {
+                                $resourcesList[] = $spaResourceMapping[$resName];
+                            }
+                        }
+                    }
+                }
+            }
 
             // Step 2: Insert into local DB
             $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1787324769682) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?)");
