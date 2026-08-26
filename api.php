@@ -290,7 +290,7 @@ try {
             }
 
             // Step 2: Insert into local DB
-            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?)");
+            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?)");
             $stmt->execute([
                 $entityType, $entityId, $entityTitle, $clientName, $clientPhone, $clientEmail,
                 $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes
@@ -482,9 +482,29 @@ try {
                 writeLog("STEP_5_BOOKING_V1_BOOKING_ADD_SKIPPED", ['reason' => 'No active resourceIds selected or found']);
             }
 
+            // Step 5b: Create SPA Item (Smart Process Automation) linked to Booking (entityTypeId 1088)
+            $b24SpaItemId = 0;
+            $spaFields = [
+                'title' => "Booking: {$serviceName} - {$clientName}",
+                'assignedById' => $ownerId,
+                'stageId' => 'DT1088_37:NEW'
+            ];
+            if ($entityType === 'LEAD') {
+                $spaFields['parentId1'] = $entityId;
+            } elseif ($entityType === 'DEAL') {
+                $spaFields['parentId2'] = $entityId;
+            }
+
+            $spaRes = CRest::call('crm.item.add', [
+                'entityTypeId' => 1088,
+                'fields' => $spaFields
+            ]);
+            writeLog("STEP_5B_SPA_ITEM_ADD", $spaRes);
+            $b24SpaItemId = $spaRes['result']['item']['id'] ?? 0;
+
             // Update local DB with B24 IDs
-            $stmt = $db->prepare("UPDATE bookings SET b24_activity_id = ?, b24_calendar_event_id = ? WHERE id = ?");
-            $stmt->execute([$b24ActivityId, $b24CalendarEventId, $bookingId]);
+            $stmt = $db->prepare("UPDATE bookings SET b24_activity_id = ?, b24_calendar_event_id = ?, b24_spa_item_id = ? WHERE id = ?");
+            $stmt->execute([$b24ActivityId, $b24CalendarEventId, $b24SpaItemId, $bookingId]);
 
             // Step 6: Send Staff Notification (im.notify.system.add)
             if ($b24UserId > 0) {
@@ -509,10 +529,26 @@ try {
 
         case 'update_status':
             $bookingId = (int)($_REQUEST['booking_id'] ?? 0);
-            $newStatus = $_REQUEST['status'] ?? 'Scheduled';
+            $newStatus = $_REQUEST['status'] ?? 'DT1088_37:NEW';
 
             $stmt = $db->prepare("UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
             $stmt->execute([$newStatus, $bookingId]);
+
+            // Fetch b24_spa_item_id from DB
+            $stmt = $db->prepare("SELECT b24_spa_item_id FROM bookings WHERE id = ?");
+            $stmt->execute([$bookingId]);
+            $b24SpaItemId = (int)$stmt->fetchColumn();
+
+            if ($b24SpaItemId > 0) {
+                $spaUpdateRes = CRest::call('crm.item.update', [
+                    'entityTypeId' => 1088,
+                    'id' => $b24SpaItemId,
+                    'fields' => [
+                        'stageId' => $newStatus
+                    ]
+                ]);
+                writeLog("UPDATE_SPA_STAGE", ['booking_id' => $bookingId, 'spa_item_id' => $b24SpaItemId, 'res' => $spaUpdateRes, 'stage' => $newStatus]);
+            }
 
             writeLog("UPDATE_STATUS", ['booking_id' => $bookingId, 'new_status' => $newStatus]);
             sendJson(['status' => 'success', 'message' => 'Status updated to ' . $newStatus]);

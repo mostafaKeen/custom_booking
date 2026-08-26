@@ -90,6 +90,12 @@ class DB {
             // Column already exists
         }
 
+        try {
+            $db->exec("ALTER TABLE bookings ADD COLUMN b24_spa_item_id INT DEFAULT 0");
+        } catch (Exception $e) {
+            // Column already exists
+        }
+
         // Insert Default Services & Staff if empty
         $stmt = $db->query("SELECT COUNT(*) FROM services");
         if ($stmt->fetchColumn() == 0) {

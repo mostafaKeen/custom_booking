@@ -288,13 +288,38 @@ function renderBookingsList(data) {
                     displayTitle + '</a>';
             }
 
+            var spaStages = {
+                'DT1088_37:NEW': { name: 'Request Made', color: '#22b9ff' },
+                'DT1088_37:PREPARATION': { name: 'Sales Admin Approval', color: '#88b9ff' },
+                'DT1088_37:CLIENT': { name: 'Executive Approval', color: '#10e5fc' },
+                'DT1088_37:SUCCESS': { name: 'Reserved', color: '#00ff00' },
+                'DT1088_37:FAIL': { name: 'Canceled', color: '#ff0000' }
+            };
+
+            var currentStatusKey = b.status;
+            if (currentStatusKey === 'Scheduled') currentStatusKey = 'DT1088_37:NEW';
+            if (currentStatusKey === 'Confirmed') currentStatusKey = 'DT1088_37:PREPARATION';
+            if (currentStatusKey === 'Completed') currentStatusKey = 'DT1088_37:SUCCESS';
+            if (currentStatusKey === 'Cancelled') currentStatusKey = 'DT1088_37:FAIL';
+
+            var currentStage = spaStages[currentStatusKey] || { name: b.status, color: '#64748b' };
+            var statusBadge = '<span class="status-pill" style="background-color: ' + currentStage.color + '20; color: ' + currentStage.color + '; border: 1px solid ' + currentStage.color + '40; font-size:11px; padding:3px 8px; border-radius:4px; font-weight:bold;">' + currentStage.name + '</span>';
+
+            var buttonsHtml = '';
+            Object.keys(spaStages).forEach(function(stageId) {
+                if (currentStatusKey !== stageId) {
+                    var stage = spaStages[stageId];
+                    buttonsHtml += '<button class="btn btn-outline btn-sm" style="border-color: ' + stage.color + '; color: ' + stage.color + '; margin-right: 6px; margin-bottom: 6px; background: transparent; font-weight: 600; cursor: pointer; transition: all 0.2s;" onclick="updateStatus(' + b.id + ', \'' + stageId + '\')">' + stage.name + '</button>';
+                }
+            });
+
             item.innerHTML =
                 '<div class="booking-item-header">' +
                     '<div>' +
                         '<span class="service-badge" style="background-color: ' + (b.service_color || '#2563eb') + '">' + b.service_name + '</span>' +
                         crmBadge +
                     '</div>' +
-                    '<span class="status-pill ' + statusClass + '">' + b.status + '</span>' +
+                    statusBadge +
                 '</div>' +
                 '<div class="booking-details">' +
                     '<strong>Date:</strong> ' + b.booking_date + ' (' + b.start_time + ' - ' + b.end_time + ')<br>' +
@@ -302,10 +327,8 @@ function renderBookingsList(data) {
                     '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
                     '<strong>Target Calendar:</strong> ' + (b.calendar_target === 'user' ? 'My Calendar' : (b.calendar_target === 'company_calendar' ? 'Public (Company Calendar)' : b.calendar_target)) +
                 '</div>' +
-                '<div class="booking-actions">' +
-                    '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Confirmed\')">Confirm</button>' +
-                    '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Completed\')">Complete</button>' +
-                    '<button class="btn btn-outline btn-sm" onclick="updateStatus(' + b.id + ', \'Cancelled\')">Cancel</button>' +
+                '<div class="booking-actions" style="margin-top: 10px; display: flex; flex-wrap: wrap;">' +
+                    buttonsHtml +
                 '</div>';
             list.appendChild(item);
         });
