@@ -17,7 +17,7 @@ header('Content-Security-Policy: frame-ancestors *');
     <title>Bitrix24 Custom Booking Widget</title>
     <!-- Bitrix24 JS SDK -->
     <script src="//api.bitrix24.com/api/v1/"></script>
-    <link rel="stylesheet" href="assets/css/widget.css">
+    <link rel="stylesheet" href="assets/css/widget.css?v=<?=time()?>">
 </head>
 <body>
     <div class="widget-container">
