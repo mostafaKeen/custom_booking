@@ -842,6 +842,7 @@ function renderBookingsList(data) {
                     '<strong>Date:</strong> ' + b.booking_date + ' (' + b.start_time + ' - ' + b.end_time + ')<br>' +
                     '<strong>Staff:</strong> ' + b.staff_name + '<br>' +
                     '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
+                    '<strong>Created By:</strong> ' + (b.created_by_name || 'N/A') + '<br>' +
                     '<strong>Target Calendar:</strong> ' + (b.calendar_target === 'user' ? 'My Calendar' : (b.calendar_target === 'company_calendar' ? 'Public (Company Calendar)' : b.calendar_target)) +
                 '</div>' +
                 '<div class="booking-actions" style="margin-top: 10px; display: flex; flex-wrap: wrap;">' +
