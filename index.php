@@ -115,11 +115,50 @@ header('Content-Security-Policy: frame-ancestors *');
                 </form>
             </div>
 
-            <!-- Right Card: Entity Booking History & Status -->
-            <div class="card">
-                <h3 class="card-title">Associated Bookings</h3>
-                <div id="bookings_list" class="booking-list">
-                    <!-- Dynamically populated bookings list -->
+            <!-- Right Card: Entity Booking History & Calendar View -->
+            <div class="card" id="bookings_card">
+                <h3 class="card-title">
+                    <span id="bookings_card_title">Associated Bookings</span>
+                    <div class="view-toggle" id="view_toggle" style="display:none;">
+                        <button type="button" class="toggle-btn active" id="btn_calendar_view" onclick="switchView('calendar')">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            Calendar
+                        </button>
+                        <button type="button" class="toggle-btn" id="btn_list_view" onclick="switchView('list')">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                            List
+                        </button>
+                    </div>
+                </h3>
+
+                <!-- Calendar View (shown in standalone mode) -->
+                <div id="calendar_view" style="display:none;">
+                    <!-- Calendar navigation bar -->
+                    <div class="calendar-nav">
+                        <button type="button" class="cal-nav-btn" id="cal_prev" onclick="calNavigate(-1)">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        </button>
+                        <span class="cal-nav-title" id="cal_nav_title">Today</span>
+                        <button type="button" class="cal-nav-btn" id="cal_next" onclick="calNavigate(1)">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </button>
+                        <button type="button" class="cal-nav-today-btn" onclick="calGoToday()">Today</button>
+                    </div>
+
+                    <!-- Mini month calendar -->
+                    <div class="calendar-mini-month" id="mini_month_calendar"></div>
+
+                    <!-- Resource calendar grid -->
+                    <div class="calendar-grid-wrapper" id="calendar_grid_wrapper">
+                        <!-- Dynamically rendered by JS -->
+                    </div>
+                </div>
+
+                <!-- List View (shown in entity mode or toggle) -->
+                <div id="list_view">
+                    <div id="bookings_list" class="booking-list">
+                        <!-- Dynamically populated bookings list -->
+                    </div>
                 </div>
             </div>
         </div>

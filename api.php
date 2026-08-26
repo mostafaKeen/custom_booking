@@ -130,6 +130,42 @@ try {
             sendJson(['status' => 'success', 'bookings' => $bookings]);
             break;
 
+        case 'get_calendar_bookings':
+            $startDate = $_REQUEST['start_date'] ?? date('Y-m-d');
+            $endDate = $_REQUEST['end_date'] ?? date('Y-m-d');
+
+            $stmt = $db->prepare("SELECT b.*, s.name as service_name, s.color as service_color, st.name as staff_name 
+                                  FROM bookings b 
+                                  LEFT JOIN services s ON b.service_id = s.id 
+                                  LEFT JOIN staff st ON b.staff_id = st.id 
+                                  WHERE b.booking_date BETWEEN ? AND ? 
+                                  ORDER BY b.booking_date ASC, b.start_time ASC");
+            $stmt->execute([$startDate, $endDate]);
+            $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Fetch B24 resources for column headers
+            $b24Resources = [];
+            $res = CRest::call('booking.v1.resource.list', []);
+            if (!empty($res['result']['resource'])) {
+                $b24Resources = $res['result']['resource'];
+            } elseif (!empty($res['result']['resources'])) {
+                $b24Resources = $res['result']['resources'];
+            } else {
+                $resCal = CRest::call('calendar.resource.list', []);
+                if (!empty($resCal['result'])) {
+                    $b24Resources = $resCal['result'];
+                }
+            }
+
+            sendJson([
+                'status' => 'success',
+                'bookings' => $bookings,
+                'resources' => $b24Resources,
+                'start_date' => $startDate,
+                'end_date' => $endDate
+            ]);
+            break;
+
         case 'get_entity_bookings':
             $entityType = $_REQUEST['entity_type'] ?? 'LEAD';
             $entityId = (int)($_REQUEST['entity_id'] ?? 0);
@@ -293,6 +329,17 @@ try {
             $bookingType = $_REQUEST['ufCrm29_1787324188722'] ?? [];
             $carReserved = $_REQUEST['ufCrm29_1787324769682'] ?? '';
 
+            // Fetch the name of the Bitrix24 user who is creating this booking
+            $createdByName = '';
+            try {
+                $userRes = CRest::call('user.current', []);
+                if (!empty($userRes['result'])) {
+                    $createdByName = trim(($userRes['result']['NAME'] ?? '') . ' ' . ($userRes['result']['LAST_NAME'] ?? ''));
+                }
+            } catch (Exception $e) {
+                writeLog('USER_CURRENT_ERROR', ['error' => $e->getMessage()]);
+            }
+
             // Resolve dynamic B24 resources to the SPA Resources mapping
             $resourcesList = [];
             if (!empty($resourceIds)) {
@@ -326,16 +373,17 @@ try {
             }
 
             // Step 2: Insert into local DB
-            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1787324769682) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?)");
+            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1787324769682, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $entityType, $entityId, $entityTitle, $clientName, $clientPhone, $clientEmail,
                 $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes,
                 is_array($bookingType) ? implode(',', $bookingType) : $bookingType,
                 is_array($resourcesList) ? implode(',', $resourcesList) : $resourcesList,
-                (int)$carReserved
+                (int)$carReserved,
+                $createdByName
             ]);
             $bookingId = $db->lastInsertId();
-            writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId, 'entity_title' => $entityTitle]);
+            writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId, 'entity_title' => $entityTitle, 'created_by' => $createdByName]);
 
             // Step 3: Create CRM Activity (crm.activity.add) with COMMUNICATIONS
             $activitySubject = "Booking: {$serviceName} with {$staffName}";

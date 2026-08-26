@@ -102,12 +102,466 @@ function adjustLayoutForStandalone() {
     }
 
     // Change title of bookings card
-    const bookingsTitle = document.querySelector('.booking-grid .card:last-child .card-title');
-    if (bookingsTitle) {
-        bookingsTitle.innerHTML = 'All Scheduled Appointments';
+    var titleEl = document.getElementById('bookings_card_title');
+    if (titleEl) {
+        titleEl.textContent = 'All Scheduled Appointments';
     }
 
-    loadAllBookings();
+    // Show view toggle
+    var viewToggle = document.getElementById('view_toggle');
+    if (viewToggle) {
+        viewToggle.style.display = 'inline-flex';
+    }
+
+    // Default to calendar view in standalone mode
+    switchView('calendar');
+}
+
+// ===== Calendar View State =====
+var calCurrentDate = new Date();
+var calResources = [];
+var calBookings = [];
+var calCurrentView = 'calendar'; // 'calendar' or 'list'
+var calMiniMonthDate = new Date();
+
+var RESOURCE_COLORS = {
+    'driver': { bg: '#eff6ff', text: '#2563eb', border: '#3b82f6', icon: '🚗' },
+    'meeting room': { bg: '#ecfdf5', text: '#059669', border: '#10b981', icon: '🏢' },
+    'photo grapher': { bg: '#fdf4ff', text: '#a855f7', border: '#a855f7', icon: '📷' },
+    'photographer': { bg: '#fdf4ff', text: '#a855f7', border: '#a855f7', icon: '📷' },
+    'video grapher': { bg: '#fff7ed', text: '#ea580c', border: '#f97316', icon: '🎥' },
+    'videographer': { bg: '#fff7ed', text: '#ea580c', border: '#f97316', icon: '🎥' }
+};
+
+var SPA_STAGES = {
+    'DT1088_37:NEW': { name: 'Request Made', color: '#22b9ff' },
+    'DT1088_37:PREPARATION': { name: 'Sales Admin Approval', color: '#88b9ff' },
+    'DT1088_37:CLIENT': { name: 'Executive Approval', color: '#10e5fc' },
+    'DT1088_37:SUCCESS': { name: 'Reserved', color: '#00ff00' },
+    'DT1088_37:FAIL': { name: 'Canceled', color: '#ff0000' }
+};
+
+function switchView(viewName) {
+    calCurrentView = viewName;
+    var calView = document.getElementById('calendar_view');
+    var listView = document.getElementById('list_view');
+    var btnCal = document.getElementById('btn_calendar_view');
+    var btnList = document.getElementById('btn_list_view');
+
+    if (viewName === 'calendar') {
+        calView.style.display = 'block';
+        listView.style.display = 'none';
+        btnCal.classList.add('active');
+        btnList.classList.remove('active');
+        loadCalendarBookings();
+    } else {
+        calView.style.display = 'none';
+        listView.style.display = 'block';
+        btnCal.classList.remove('active');
+        btnList.classList.add('active');
+        loadAllBookings();
+    }
+}
+
+function calNavigate(delta) {
+    calCurrentDate.setDate(calCurrentDate.getDate() + delta);
+    loadCalendarBookings();
+}
+
+function calGoToday() {
+    calCurrentDate = new Date();
+    calMiniMonthDate = new Date();
+    loadCalendarBookings();
+}
+
+function loadCalendarBookings() {
+    var dateStr = formatDate(calCurrentDate);
+
+    // Show loading spinner
+    var wrapper = document.getElementById('calendar_grid_wrapper');
+    wrapper.innerHTML = '<div class="cal-loading"><div class="spinner"></div>Loading calendar…</div>';
+
+    // Update nav title
+    var titleEl = document.getElementById('cal_nav_title');
+    var dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    var monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    titleEl.textContent = dayNames[calCurrentDate.getDay()] + ', ' + monthNames[calCurrentDate.getMonth()] + ' ' + calCurrentDate.getDate() + ', ' + calCurrentDate.getFullYear();
+
+    fetch('api.php?action=get_calendar_bookings&start_date=' + dateStr + '&end_date=' + dateStr + getAuthParams())
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                calResources = data.resources || [];
+                calBookings = data.bookings || [];
+                renderCalendarGrid();
+                renderMiniMonth();
+            } else {
+                wrapper.innerHTML = '<p style="text-align:center; color:#ef4444; padding:20px;">Failed to load calendar data.</p>';
+            }
+        })
+        .catch(function(err) {
+            console.error('Calendar load error:', err);
+            wrapper.innerHTML = '<p style="text-align:center; color:#ef4444; padding:20px;">Error loading calendar.</p>';
+        });
+}
+
+function formatDate(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+}
+
+function formatTime12(timeStr) {
+    var parts = timeStr.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parts[1] || '00';
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return h + ':' + m + ' ' + ampm;
+}
+
+function renderCalendarGrid() {
+    var wrapper = document.getElementById('calendar_grid_wrapper');
+
+    // Use resources as columns; fallback to hardcoded if none returned
+    var columns = [];
+    if (calResources.length > 0) {
+        calResources.forEach(function(r) {
+            var rName = r.name || r.NAME || 'Resource';
+            var rId = r.id || r.ID || 0;
+            columns.push({ id: rId, name: rName });
+        });
+    } else {
+        columns = [
+            { id: 'driver', name: 'Driver' },
+            { id: 'meeting_room', name: 'Meeting Room' },
+            { id: 'photographer', name: 'Photo Grapher' },
+            { id: 'videographer', name: 'Video Grapher' }
+        ];
+    }
+
+    // Generate 30-min time slots from 07:00 to 19:00
+    var timeSlots = [];
+    for (var h = 7; h < 19; h++) {
+        timeSlots.push({ hour: h, minute: 0, label: formatTime12(String(h).padStart(2, '0') + ':00') });
+        timeSlots.push({ hour: h, minute: 30, label: '' });
+    }
+
+    var numCols = columns.length + 1; // +1 for time column
+
+    var html = '<div class="calendar-grid" style="grid-template-columns: 70px repeat(' + columns.length + ', 1fr);">';
+
+    // Header row
+    html += '<div class="cg-header">';
+    html += '<div class="cg-header-cell cg-time-header">Time</div>';
+    columns.forEach(function(col) {
+        var rKey = col.name.toLowerCase();
+        var colors = RESOURCE_COLORS[rKey] || { bg: '#f1f5f9', text: '#475569', border: '#94a3b8', icon: '📌' };
+        html += '<div class="cg-header-cell">' +
+            '<div class="resource-icon" style="background:' + colors.bg + ';">' + colors.icon + '</div>' +
+            col.name +
+            '</div>';
+    });
+    html += '</div>';
+
+    // Time rows
+    timeSlots.forEach(function(slot, rowIndex) {
+        html += '<div class="cg-row">';
+        html += '<div class="cg-time-label">' + (slot.label || '') + '</div>';
+
+        columns.forEach(function(col, colIndex) {
+            var cellId = 'cell_' + rowIndex + '_' + colIndex;
+            html += '<div class="cg-cell" id="' + cellId + '" data-row="' + rowIndex + '" data-col="' + colIndex + '" data-resource-id="' + col.id + '" data-resource-name="' + col.name + '"></div>';
+        });
+
+        html += '</div>';
+    });
+
+    html += '</div>';
+    wrapper.innerHTML = html;
+
+    // Place event cards
+    placeEventCards(columns, timeSlots);
+}
+
+function placeEventCards(columns, timeSlots) {
+    calBookings.forEach(function(booking) {
+        // Determine which resource column(s) this booking belongs to
+        var bookingResourceIds = [];
+        if (booking.ufCrm29_1787324656) {
+            // This field stores the SPA resource IDs (comma-separated)
+            bookingResourceIds = String(booking.ufCrm29_1787324656).split(',').map(function(s) { return s.trim(); });
+        }
+
+        // Match booking to columns
+        var matchedColumns = [];
+        columns.forEach(function(col, colIndex) {
+            var colId = String(col.id);
+            var colName = col.name.toLowerCase();
+
+            // Check by resource ID match
+            if (bookingResourceIds.indexOf(colId) >= 0) {
+                matchedColumns.push(colIndex);
+                return;
+            }
+
+            // Check by name match against the B24 resource IDs
+            // SPA mapping: driver=699, meeting room=701, photo grapher=703, video grapher=705
+            var spaMap = { '699': ['driver'], '701': ['meeting room'], '703': ['photo grapher', 'photographer'], '705': ['video grapher', 'videographer'] };
+            bookingResourceIds.forEach(function(resId) {
+                if (spaMap[resId]) {
+                    spaMap[resId].forEach(function(name) {
+                        if (colName.indexOf(name) >= 0 || name.indexOf(colName) >= 0) {
+                            if (matchedColumns.indexOf(colIndex) < 0) {
+                                matchedColumns.push(colIndex);
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        // If no match found, try to match by the actual B24 resource IDs stored in form
+        if (matchedColumns.length === 0 && bookingResourceIds.length > 0) {
+            // Place in first column as fallback
+            matchedColumns.push(0);
+        }
+
+        // If still no resource at all, skip (or place in first column)
+        if (matchedColumns.length === 0) {
+            matchedColumns.push(0);
+        }
+
+        // Calculate row position
+        var startParts = booking.start_time.split(':');
+        var endParts = booking.end_time.split(':');
+        var startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1], 10);
+        var endMinutes = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1], 10);
+
+        var gridStartMinutes = 7 * 60; // 07:00
+        var slotHeight = 48; // px per 30-min slot
+
+        var topPx = ((startMinutes - gridStartMinutes) / 30) * slotHeight;
+        var heightPx = ((endMinutes - startMinutes) / 30) * slotHeight;
+        if (heightPx < 24) heightPx = 24;
+
+        // Get color
+        var serviceColor = booking.service_color || '#3b82f6';
+        var statusInfo = SPA_STAGES[booking.status] || { name: booking.status, color: '#64748b' };
+
+        matchedColumns.forEach(function(colIndex) {
+            // Find the first cell in this column to append to
+            var cellId = 'cell_0_' + colIndex;
+            var cell = document.getElementById(cellId);
+            if (!cell) return;
+
+            var eventEl = document.createElement('div');
+            eventEl.className = 'cal-event';
+            eventEl.style.top = topPx + 'px';
+            eventEl.style.height = heightPx + 'px';
+            eventEl.style.borderLeftColor = serviceColor;
+            eventEl.style.background = hexToRgba(serviceColor, 0.08);
+            eventEl.style.color = serviceColor;
+
+            var clientDisplay = booking.client_name || 'N/A';
+            var staffDisplay = booking.staff_name || '';
+            var createdBy = booking.created_by_name || '';
+
+            eventEl.innerHTML =
+                '<div class="cal-event-title">' + escapeHtml(booking.service_name || 'Booking') + '</div>' +
+                '<div class="cal-event-time">' + formatTime12(booking.start_time) + ' – ' + formatTime12(booking.end_time) + '</div>' +
+                '<div class="cal-event-client">👤 ' + escapeHtml(clientDisplay) + '</div>' +
+                (createdBy ? '<div class="cal-event-staff">By: ' + escapeHtml(createdBy) + '</div>' : '') +
+                '<div style="margin-top:2px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + statusInfo.color + ';margin-right:3px;"></span><span style="font-size:8px;opacity:0.6;">' + escapeHtml(statusInfo.name) + '</span></div>';
+
+            eventEl.onclick = function(e) {
+                e.stopPropagation();
+                showEventPopup(booking);
+            };
+
+            // Append to the column's first row cell, positioned absolutely
+            cell.style.position = 'relative';
+            cell.appendChild(eventEl);
+        });
+    });
+}
+
+function hexToRgba(hex, alpha) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    var r = parseInt(hex.substring(0, 2), 16);
+    var g = parseInt(hex.substring(2, 4), 16);
+    var b = parseInt(hex.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
+function showEventPopup(booking) {
+    // Remove any existing popup
+    var existing = document.querySelector('.cal-event-popup-overlay');
+    if (existing) existing.remove();
+
+    var statusInfo = SPA_STAGES[booking.status] || { name: booking.status, color: '#64748b' };
+    var serviceColor = booking.service_color || '#3b82f6';
+
+    // CRM link
+    var crmLinkHtml = '';
+    if (booking.entity_id > 0) {
+        var domain = 'capitalwestern.bitrix24.com';
+        if (typeof BX24 !== 'undefined' && BX24 !== null) {
+            try { var auth = BX24.getAuth(); if (auth && auth.domain) domain = auth.domain; } catch(e) {}
+        }
+        var entityPath = (booking.entity_type || '').toLowerCase() === 'lead' ? 'lead' : 'deal';
+        var entityUrl = 'https://' + domain + '/crm/' + entityPath + '/details/' + booking.entity_id + '/';
+        var displayTitle = booking.entity_title || (booking.entity_type + ' #' + booking.entity_id);
+        crmLinkHtml = '<a href="' + entityUrl + '" target="_blank" style="color:var(--primary); text-decoration:none; font-weight:500;">' + escapeHtml(displayTitle) + ' ↗</a>';
+    }
+
+    // Status change buttons
+    var buttonsHtml = '';
+    Object.keys(SPA_STAGES).forEach(function(stageId) {
+        if (booking.status !== stageId) {
+            var stage = SPA_STAGES[stageId];
+            buttonsHtml += '<button class="popup-status-btn" style="border-color:' + stage.color + '; color:' + stage.color + ';" onclick="updateStatusFromPopup(' + booking.id + ', \'' + stageId + '\')">' + stage.name + '</button>';
+        }
+    });
+
+    var overlay = document.createElement('div');
+    overlay.className = 'cal-event-popup-overlay';
+    overlay.onclick = function(e) {
+        if (e.target === overlay) overlay.remove();
+    };
+
+    overlay.innerHTML =
+        '<div class="cal-event-popup">' +
+            '<div class="popup-header" style="background: linear-gradient(135deg, ' + serviceColor + ', ' + serviceColor + 'cc);">' +
+                '<button class="popup-close" onclick="this.closest(\'.cal-event-popup-overlay\').remove()">✕</button>' +
+                '<h4>' + escapeHtml(booking.service_name || 'Booking') + '</h4>' +
+                '<div class="popup-time">' + booking.booking_date + ' • ' + formatTime12(booking.start_time) + ' – ' + formatTime12(booking.end_time) + '</div>' +
+            '</div>' +
+            '<div class="popup-body">' +
+                '<div class="popup-row"><span class="popup-label">Status</span><span class="popup-value"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + statusInfo.color + ';margin-right:5px;"></span>' + escapeHtml(statusInfo.name) + '</span></div>' +
+                '<div class="popup-row"><span class="popup-label">Client</span><span class="popup-value">' + escapeHtml(booking.client_name || 'N/A') + '</span></div>' +
+                '<div class="popup-row"><span class="popup-label">Phone</span><span class="popup-value">' + escapeHtml(booking.client_phone || 'N/A') + '</span></div>' +
+                '<div class="popup-row"><span class="popup-label">Staff</span><span class="popup-value">' + escapeHtml(booking.staff_name || 'N/A') + '</span></div>' +
+                (booking.created_by_name ? '<div class="popup-row"><span class="popup-label">Created By</span><span class="popup-value">' + escapeHtml(booking.created_by_name) + '</span></div>' : '') +
+                (crmLinkHtml ? '<div class="popup-row"><span class="popup-label">CRM</span><span class="popup-value">' + crmLinkHtml + '</span></div>' : '') +
+            '</div>' +
+            (buttonsHtml ? '<div class="popup-footer">' + buttonsHtml + '</div>' : '') +
+        '</div>';
+
+    document.body.appendChild(overlay);
+}
+
+function updateStatusFromPopup(bookingId, status) {
+    if (!confirm('Change status to ' + (SPA_STAGES[status] ? SPA_STAGES[status].name : status) + '?')) return;
+
+    // Close popup
+    var overlay = document.querySelector('.cal-event-popup-overlay');
+    if (overlay) overlay.remove();
+
+    var formData = new FormData();
+    formData.append('action', 'update_status');
+    formData.append('booking_id', bookingId);
+    formData.append('status', status);
+
+    var postUrl = 'api.php?' + getAuthParams().substring(1);
+
+    fetch(postUrl, { method: 'POST', body: formData })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                if (calCurrentView === 'calendar') {
+                    loadCalendarBookings();
+                } else {
+                    loadAllBookings();
+                }
+            } else {
+                alert('Error updating status: ' + data.message);
+            }
+        })
+        .catch(function(err) { console.error('Failed to update status:', err); });
+}
+
+// ===== Mini Month Calendar =====
+function renderMiniMonth() {
+    var container = document.getElementById('mini_month_calendar');
+    var year = calMiniMonthDate.getFullYear();
+    var month = calMiniMonthDate.getMonth();
+    var monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    var today = new Date();
+    var selectedDateStr = formatDate(calCurrentDate);
+
+    // Determine which dates have events
+    var eventDates = {};
+    calBookings.forEach(function(b) {
+        eventDates[b.booking_date] = true;
+    });
+
+    var firstDay = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    var html = '<div class="mini-month-header">' +
+        '<button type="button" class="mini-month-nav" onclick="miniMonthNav(-1)">◀</button>' +
+        '<span class="mini-month-title">' + monthNames[month] + ' ' + year + '</span>' +
+        '<button type="button" class="mini-month-nav" onclick="miniMonthNav(1)">▶</button>' +
+        '</div>';
+
+    html += '<div class="mini-month-grid">';
+
+    // Day headers
+    var dayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+    dayLabels.forEach(function(label) {
+        html += '<div class="day-header">' + label + '</div>';
+    });
+
+    // Previous month trailing days
+    for (var i = firstDay - 1; i >= 0; i--) {
+        var prevDay = daysInPrevMonth - i;
+        html += '<div class="day-cell other-month">' + prevDay + '</div>';
+    }
+
+    // Current month days
+    for (var d = 1; d <= daysInMonth; d++) {
+        var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        var classes = 'day-cell';
+        if (dateStr === formatDate(today)) classes += ' today';
+        if (dateStr === selectedDateStr) classes += ' selected';
+        if (eventDates[dateStr]) classes += ' has-events';
+        html += '<div class="' + classes + '" onclick="miniMonthSelectDay(' + year + ',' + month + ',' + d + ')">' + d + '</div>';
+    }
+
+    // Next month leading days
+    var totalCells = firstDay + daysInMonth;
+    var remaining = (7 - (totalCells % 7)) % 7;
+    for (var j = 1; j <= remaining; j++) {
+        html += '<div class="day-cell other-month">' + j + '</div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function miniMonthNav(delta) {
+    calMiniMonthDate.setMonth(calMiniMonthDate.getMonth() + delta);
+    renderMiniMonth();
+}
+
+function miniMonthSelectDay(year, month, day) {
+    calCurrentDate = new Date(year, month, day);
+    calMiniMonthDate = new Date(year, month, 1);
+    loadCalendarBookings();
 }
 
 function loadServicesAndStaff() {
