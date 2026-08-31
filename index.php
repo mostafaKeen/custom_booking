@@ -8,6 +8,8 @@ require_once __DIR__ . '/db.php';
 // Allow embedding in Bitrix24 iframe
 header('X-Frame-Options: ALLOWALL');
 header('Content-Security-Policy: frame-ancestors *');
+
+$isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(__DIR__ . '/data'));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -21,6 +23,11 @@ header('Content-Security-Policy: frame-ancestors *');
 </head>
 <body>
     <div class="widget-container">
+        <?php if (!$isWritable): ?>
+            <div style="background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 5px; font-family: sans-serif; font-weight: 500;">
+                <strong>Warning:</strong> The application directory is not writable. Settings and logs cannot be saved. Standalone mode will not function properly. Please grant full write permissions to the web server user on the application folder.
+            </div>
+        <?php endif; ?>
         <!-- Widget Header -->
         <div class="widget-header">
             <h2 class="widget-title">

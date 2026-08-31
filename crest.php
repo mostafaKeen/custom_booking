@@ -84,9 +84,9 @@ class CRest {
     public static function setSettings($arSettings) {
         $dir = dirname(static::$datafile);
         if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
+            @mkdir($dir, 0755, true);
         }
-        return file_put_contents(static::$datafile, json_encode($arSettings, JSON_PRETTY_PRINT));
+        return @file_put_contents(static::$datafile, json_encode($arSettings, JSON_PRETTY_PRINT));
     }
 
     public static function refreshToken() {

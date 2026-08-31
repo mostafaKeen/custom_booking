@@ -811,7 +811,9 @@ function initCrmLinkFields() {
             }
 
             searchTimeout = setTimeout(function() {
-                fetch('api.php?action=search_crm_entities&type=' + type.toLowerCase() + '&query=' + encodeURIComponent(query) + getAuthParams())
+                var baseUrl = window.location.protocol + '//' + window.location.host + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+                var fetchUrl = baseUrl + '/api.php?action=search_crm_entities&type=' + type.toLowerCase() + '&query=' + encodeURIComponent(query) + getAuthParams();
+                fetch(fetchUrl)
                     .then(function(res) { return res.json(); })
                     .then(function(data) {
                         crmSearchResults.innerHTML = '';

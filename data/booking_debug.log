@@ -1,0 +1,18 @@
+[2026-08-31 07:28:06] [API_REQUEST_START] {
+    "action": "search_crm_entities",
+    "method": "UNKNOWN",
+    "request_params": {
+        "action": "search_crm_entities",
+        "type": "lead",
+        "query": "mosta"
+    }
+}
+--------------------------------------------------------------------------------
+[2026-08-31 07:28:06] [SEARCH_CRM_LEADS_RESULT] {
+    "query": "mosta",
+    "res": {
+        "error": "NO_AUTH_SETTINGS",
+        "error_description": "Bitrix24 domain or AUTH_ID not configured."
+    }
+}
+--------------------------------------------------------------------------------
