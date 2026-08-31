@@ -1,0 +1,4 @@
+config.local.php
+data/
+*.log
+*.sqlite
