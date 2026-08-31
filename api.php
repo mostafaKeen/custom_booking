@@ -38,13 +38,24 @@ try {
         case 'search_crm_entities':
             $type = strtolower($_REQUEST['type'] ?? 'lead');
             $query = $_REQUEST['query'] ?? '';
+            $start = (int)($_REQUEST['start'] ?? 0);
             $results = [];
+            $next = null;
+
+            $filter = [];
+            if (!empty($query)) {
+                $filter['%TITLE'] = $query;
+            }
+
             if ($type === 'lead') {
                 $res = CRest::call('crm.lead.list', [
-                    'filter' => ['%TITLE' => $query],
-                    'select' => ['ID', 'TITLE', 'NAME', 'LAST_NAME', 'PHONE']
+                    'filter' => $filter,
+                    'select' => ['ID', 'TITLE', 'NAME', 'LAST_NAME', 'PHONE'],
+                    'order' => ['ID' => 'DESC'],
+                    'start' => $start
                 ]);
-                writeLog("SEARCH_CRM_LEADS_RESULT", ['query' => $query, 'res' => $res]);
+                writeLog("SEARCH_CRM_LEADS_RESULT", ['query' => $query, 'start' => $start, 'res' => $res]);
+                $next = $res['next'] ?? null;
                 if (!empty($res['result']) && is_array($res['result'])) {
                     foreach ($res['result'] as $item) {
                         $phone = '';
@@ -61,10 +72,13 @@ try {
                 }
             } else if ($type === 'deal') {
                 $res = CRest::call('crm.deal.list', [
-                    'filter' => ['%TITLE' => $query],
-                    'select' => ['ID', 'TITLE', 'CONTACT_ID']
+                    'filter' => $filter,
+                    'select' => ['ID', 'TITLE', 'CONTACT_ID'],
+                    'order' => ['ID' => 'DESC'],
+                    'start' => $start
                 ]);
-                writeLog("SEARCH_CRM_DEALS_RESULT", ['query' => $query, 'res' => $res]);
+                writeLog("SEARCH_CRM_DEALS_RESULT", ['query' => $query, 'start' => $start, 'res' => $res]);
+                $next = $res['next'] ?? null;
                 if (!empty($res['result']) && is_array($res['result'])) {
                     foreach ($res['result'] as $item) {
                         $contactId = (int)($item['CONTACT_ID'] ?? 0);
@@ -88,7 +102,7 @@ try {
                     }
                 }
             }
-            sendJson(['status' => 'success', 'results' => $results]);
+            sendJson(['status' => 'success', 'results' => $results, 'next' => $next]);
             break;
 
         case 'get_services_and_staff':

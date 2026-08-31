@@ -761,6 +761,95 @@ function initCrmLinkFields() {
     if (!crmLinkType || !crmSearchInput || !crmSearchResults) return;
 
     var searchTimeout = null;
+    var currentNextStart = null;
+
+    function fetchCrmEntities(type, query, start, append) {
+        if (type === 'NONE') {
+            crmSearchResults.innerHTML = '';
+            crmSearchResults.style.display = 'none';
+            return;
+        }
+
+        var baseUrl = window.location.protocol + '//' + window.location.host + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+        var fetchUrl = baseUrl + '/api.php?action=search_crm_entities&type=' + type.toLowerCase() + '&query=' + encodeURIComponent(query) + '&start=' + start + getAuthParams();
+
+        if (!append) {
+            crmSearchResults.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b; text-align:center;">Loading...</div>';
+            crmSearchResults.style.display = 'block';
+        }
+
+        fetch(fetchUrl)
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                // Remove loading indicator if not appending
+                if (!append) {
+                    crmSearchResults.innerHTML = '';
+                } else {
+                    // Remove previous "Load More" button if it exists
+                    var loadMoreBtn = crmSearchResults.querySelector('.autocomplete-load-more');
+                    if (loadMoreBtn) loadMoreBtn.remove();
+                }
+
+                if (data.status === 'success' && data.results && data.results.length > 0) {
+                    data.results.forEach(function(item) {
+                        var div = document.createElement('div');
+                        div.className = 'autocomplete-item';
+                        
+                        var subtitle = 'ID: ' + item.id;
+                        if (item.name) subtitle += ' | Client: ' + item.name;
+                        if (item.phone) subtitle += ' (' + item.phone + ')';
+
+                        div.innerHTML = '<span class="item-title">' + item.title + '</span>' +
+                                        '<span class="item-subtitle">' + subtitle + '</span>';
+
+                        div.onclick = function() {
+                            crmEntityId.value = item.id;
+                            crmSearchInput.value = item.title;
+                            crmSearchResults.innerHTML = '';
+                            crmSearchResults.style.display = 'none';
+
+                            // Auto fill client details
+                            if (item.name) {
+                                document.getElementById('client_name').value = item.name;
+                            }
+                            if (item.phone) {
+                                document.getElementById('client_phone').value = item.phone;
+                            }
+                        };
+                        crmSearchResults.appendChild(div);
+                    });
+
+                    // Show "Load More" button if there's a next page
+                    if (data.next) {
+                        currentNextStart = data.next;
+                        var loadMoreDiv = document.createElement('div');
+                        loadMoreDiv.className = 'autocomplete-load-more';
+                        loadMoreDiv.style = 'padding: 8px 12px; cursor: pointer; text-align: center; font-size: 12px; color: var(--primary); font-weight: 600; border-top: 1px solid var(--border-color); background: #f8fafc;';
+                        loadMoreDiv.textContent = 'Load More...';
+                        loadMoreDiv.onclick = function(e) {
+                            e.stopPropagation(); // Prevent closing dropdown
+                            fetchCrmEntities(type, query, currentNextStart, true);
+                        };
+                        crmSearchResults.appendChild(loadMoreDiv);
+                    } else {
+                        currentNextStart = null;
+                    }
+                    
+                    crmSearchResults.style.display = 'block';
+                } else {
+                    if (!append) {
+                        crmSearchResults.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b; text-align:center;">No results found</div>';
+                        crmSearchResults.style.display = 'block';
+                    }
+                }
+            })
+            .catch(function(err) {
+                console.error('CRM search error:', err);
+                if (!append) {
+                    crmSearchResults.innerHTML = '<div style="padding:10px; font-size:12px; color:#ef4444; text-align:center;">Error loading results</div>';
+                }
+            });
+    }
 
     if (placementInfo.entityId > 0) {
         // We are in LEAD or DEAL view - lock the fields
@@ -795,65 +884,30 @@ function initCrmLinkFields() {
                 crmLinkDetails.style.display = 'block';
                 crmSearchInput.required = true;
                 crmSearchInput.placeholder = 'Type to search ' + (val === 'LEAD' ? 'Leads' : 'Deals') + '...';
+                
+                // Immediately load the first page of Leads/Deals
+                fetchCrmEntities(val, '', 0, false);
             }
         });
 
-        // Autocomplete search keyup event with debounce
+        // Trigger loading when search box gains focus
+        crmSearchInput.addEventListener('focus', function() {
+            var val = crmLinkType.value;
+            if (val !== 'NONE' && crmSearchResults.style.display === 'none') {
+                fetchCrmEntities(val, this.value.trim(), 0, false);
+            }
+        });
+
+        // Autocomplete search input event with debounce
         crmSearchInput.addEventListener('input', function() {
             var query = this.value.trim();
             var type = crmLinkType.value;
 
             if (searchTimeout) clearTimeout(searchTimeout);
-            if (query.length < 2 || type === 'NONE') {
-                crmSearchResults.innerHTML = '';
-                crmSearchResults.style.display = 'none';
-                return;
-            }
+            if (type === 'NONE') return;
 
             searchTimeout = setTimeout(function() {
-                var baseUrl = window.location.protocol + '//' + window.location.host + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
-                var fetchUrl = baseUrl + '/api.php?action=search_crm_entities&type=' + type.toLowerCase() + '&query=' + encodeURIComponent(query) + getAuthParams();
-                fetch(fetchUrl)
-                    .then(function(res) { return res.json(); })
-                    .then(function(data) {
-                        crmSearchResults.innerHTML = '';
-                        if (data.status === 'success' && data.results && data.results.length > 0) {
-                            data.results.forEach(function(item) {
-                                var div = document.createElement('div');
-                                div.className = 'autocomplete-item';
-                                
-                                var subtitle = 'ID: ' + item.id;
-                                if (item.name) subtitle += ' | Client: ' + item.name;
-                                if (item.phone) subtitle += ' (' + item.phone + ')';
-
-                                div.innerHTML = '<span class="item-title">' + item.title + '</span>' +
-                                                '<span class="item-subtitle">' + subtitle + '</span>';
-
-                                div.onclick = function() {
-                                    crmEntityId.value = item.id;
-                                    crmSearchInput.value = item.title;
-                                    crmSearchResults.innerHTML = '';
-                                    crmSearchResults.style.display = 'none';
-
-                                    // Auto fill client details
-                                    if (item.name) {
-                                        document.getElementById('client_name').value = item.name;
-                                    }
-                                    if (item.phone) {
-                                        document.getElementById('client_phone').value = item.phone;
-                                    }
-                                };
-                                crmSearchResults.appendChild(div);
-                            });
-                            crmSearchResults.style.display = 'block';
-                        } else {
-                            crmSearchResults.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b; text-align:center;">No results found</div>';
-                            crmSearchResults.style.display = 'block';
-                        }
-                    })
-                    .catch(function(err) {
-                        console.error('CRM search error:', err);
-                    });
+                fetchCrmEntities(type, query, 0, false);
             }, 300);
         });
 
