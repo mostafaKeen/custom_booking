@@ -657,6 +657,18 @@ function loadServicesAndStaff() {
                     b24ResourceSelect.innerHTML = '<option value="">No Active Bitrix24 Resources</option>';
                 }
 
+                // Populate dynamic Car Reserved options from entityTypeId 1088 fields
+                var carSelect = document.getElementById('ufCrm29_1787324769682');
+                if (carSelect && data.car_options && data.car_options.length > 0) {
+                    carSelect.innerHTML = '';
+                    data.car_options.forEach(function(c) {
+                        var opt = document.createElement('option');
+                        opt.value = c.ID;
+                        opt.textContent = c.VALUE;
+                        carSelect.appendChild(opt);
+                    });
+                }
+
                 document.getElementById('booking_date').value = new Date().toISOString().split('T')[0];
                 loadSlots();
                 handleCarReservationRules();
@@ -670,7 +682,7 @@ function loadServicesAndStaff() {
 function handleCarReservationRules() {
     var resourceSelect = document.getElementById('b24_resource_id');
     var carSelect = document.getElementById('ufCrm29_1787324769682');
-    if (!resourceSelect || !carSelect) return;
+    if (!resourceSelect || !carSelect || carSelect.options.length === 0) return;
 
     var isDriverSelected = false;
     for (var i = 0; i < resourceSelect.options.length; i++) {
@@ -681,29 +693,46 @@ function handleCarReservationRules() {
         }
     }
 
-    var noCarOpt = carSelect.querySelector('option[value="707"]');
-    var car1Opt = carSelect.querySelector('option[value="709"]');
-    var car2Opt = carSelect.querySelector('option[value="711"]');
-    var car3Opt = carSelect.querySelector('option[value="713"]');
+    var noCarOpt = null;
+    var firstVehicleOpt = null;
+
+    for (var j = 0; j < carSelect.options.length; j++) {
+        var cOpt = carSelect.options[j];
+        if (cOpt.text.toLowerCase().indexOf('no car') >= 0 || cOpt.value == '707') {
+            noCarOpt = cOpt;
+        } else if (!firstVehicleOpt) {
+            firstVehicleOpt = cOpt;
+        }
+    }
 
     if (isDriverSelected) {
-        // Forced to choose Car 1, Car 2, or Car 3
-        if (noCarOpt) noCarOpt.disabled = true;
-        if (car1Opt) car1Opt.disabled = false;
-        if (car2Opt) car2Opt.disabled = false;
-        if (car3Opt) car3Opt.disabled = false;
-
-        if (carSelect.value === '707' || !carSelect.value) {
-            carSelect.value = '709'; // Default to Car 1
+        // Driver selected: disable "No Car", enable all vehicles
+        for (var k = 0; k < carSelect.options.length; k++) {
+            var cOpt = carSelect.options[k];
+            if (cOpt === noCarOpt) {
+                cOpt.disabled = true;
+            } else {
+                cOpt.disabled = false;
+            }
+        }
+        if (!carSelect.value || (noCarOpt && carSelect.value === String(noCarOpt.value))) {
+            if (firstVehicleOpt) {
+                carSelect.value = firstVehicleOpt.value;
+            }
         }
     } else {
-        // Forced to choose No Car
-        if (noCarOpt) noCarOpt.disabled = false;
-        if (car1Opt) car1Opt.disabled = true;
-        if (car2Opt) car2Opt.disabled = true;
-        if (car3Opt) car3Opt.disabled = true;
-
-        carSelect.value = '707'; // Default to No Car
+        // Driver not selected: enable "No Car", disable vehicles
+        for (var k = 0; k < carSelect.options.length; k++) {
+            var cOpt = carSelect.options[k];
+            if (cOpt === noCarOpt) {
+                cOpt.disabled = false;
+            } else {
+                cOpt.disabled = true;
+            }
+        }
+        if (noCarOpt) {
+            carSelect.value = noCarOpt.value;
+        }
     }
 }
 
@@ -766,7 +795,8 @@ function setupEventListeners() {
         }
 
         // Validate Car Selection rules
-        var carVal = document.getElementById('ufCrm29_1787324769682').value;
+        var carSelect = document.getElementById('ufCrm29_1787324769682');
+        var carVal = carSelect ? carSelect.value : '';
         var resSelect = document.getElementById('b24_resource_id');
         var isDriverSelected = false;
         for (var i = 0; i < resSelect.options.length; i++) {
@@ -776,12 +806,20 @@ function setupEventListeners() {
             }
         }
 
-        if (isDriverSelected && carVal === '707') {
-            alert('When "Driver" is selected, you must choose Car 1, Car 2, or Car 3.');
+        var noCarId = '707';
+        for (var j = 0; j < carSelect.options.length; j++) {
+            if (carSelect.options[j].text.toLowerCase().indexOf('no car') >= 0) {
+                noCarId = String(carSelect.options[j].value);
+                break;
+            }
+        }
+
+        if (isDriverSelected && carVal === noCarId) {
+            alert('When "Driver" is selected, you must choose a vehicle (e.g. Toyota Fortuner, Tahoe, Range Rover, MB Viano).');
             return;
         }
-        if (!isDriverSelected && carVal !== '707') {
-            alert('Car reservation (Car 1/2/3) is only permitted when "Driver" is selected.');
+        if (!isDriverSelected && carVal !== noCarId) {
+            alert('Vehicle reservation is only permitted when "Driver" is selected.');
             return;
         }
 

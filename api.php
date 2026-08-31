@@ -126,11 +126,38 @@ try {
                 }
             }
 
+            // Fetch dynamic Car Reserved enumeration fields from SPA entityTypeId 1088
+            $carOptions = [];
+            $spaFieldsRes = CRest::call('crm.item.fields', ['entityTypeId' => 1088]);
+            writeLog("REST_CALL_crm.item.fields_1088", $spaFieldsRes);
+            if (!empty($spaFieldsRes['result']['fields'])) {
+                foreach ($spaFieldsRes['result']['fields'] as $key => $field) {
+                    if (strtolower(str_replace('_', '', $key)) === 'ufcrm291787324769682') {
+                        if (!empty($field['items']) && is_array($field['items'])) {
+                            $carOptions = $field['items'];
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Fallback default car options if offline or not returned
+            if (empty($carOptions)) {
+                $carOptions = [
+                    ['ID' => 707, 'VALUE' => 'No Car'],
+                    ['ID' => 709, 'VALUE' => 'Toyota Fortuner'],
+                    ['ID' => 711, 'VALUE' => 'Tahoe'],
+                    ['ID' => 713, 'VALUE' => 'Range Rover'],
+                    ['ID' => 755, 'VALUE' => 'MB Viano']
+                ];
+            }
+
             sendJson([
                 'status' => 'success',
                 'services' => $services,
                 'staff' => $staff,
-                'b24_resources' => $b24Resources
+                'b24_resources' => $b24Resources,
+                'car_options' => $carOptions
             ]);
             break;
 

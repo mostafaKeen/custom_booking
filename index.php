@@ -83,9 +83,10 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                         <label for="ufCrm29_1787324769682">Car Reserved *</label>
                         <select id="ufCrm29_1787324769682" name="ufCrm29_1787324769682" class="form-control" required>
                             <option value="707">No Car</option>
-                            <option value="709">Car 1</option>
-                            <option value="711">Car 2</option>
-                            <option value="713">Car 3</option>
+                            <option value="709">Toyota Fortuner</option>
+                            <option value="711">Tahoe</option>
+                            <option value="713">Range Rover</option>
+                            <option value="755">MB Viano</option>
                         </select>
                     </div>
 
