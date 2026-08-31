@@ -35,12 +35,12 @@ class CRest {
 
         if (!empty($arSettings['WEBHOOK_URL'])) {
             $url = rtrim($arSettings['WEBHOOK_URL'], '/') . '/' . $method . '.json';
-            $queryData = http_build_query($params);
         } else {
             $url = 'https://' . $arSettings['DOMAIN'] . '/rest/' . $method . '.json';
             $params['auth'] = $arSettings['AUTH_ID'];
-            $queryData = http_build_query($params);
         }
+
+        $queryData = json_encode($params);
 
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -52,6 +52,7 @@ class CRest {
             CURLOPT_FORBID_REUSE => 1,
             CURLOPT_TIMEOUT => 30,
             CURLOPT_POSTFIELDS => $queryData,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_SSL_VERIFYPEER => 0,
             CURLOPT_SSL_VERIFYHOST => 0,
         ]);
