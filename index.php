@@ -101,21 +101,7 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="crm_link_type">Link to CRM Entity</label>
-                        <select id="crm_link_type" name="crm_link_type" class="form-control">
-                            <option value="NONE">Do Not Link</option>
-                            <option value="LEAD">Link to Lead</option>
-                            <option value="DEAL">Link to Deal</option>
-                        </select>
-                    </div>
 
-                    <div id="crm_link_details" class="form-group" style="display: none; position: relative;">
-                        <label for="crm_search_input">Search CRM Entity (by Title)</label>
-                        <input type="text" id="crm_search_input" class="form-control" placeholder="Type to search Lead or Deal..." autocomplete="off">
-                        <input type="hidden" id="crm_entity_id" name="crm_entity_id" value="0">
-                        <div id="crm_search_results" class="autocomplete-results" style="display: none;"></div>
-                    </div>
 
                     <div class="form-group">
                         <label for="client_name">Client Name</label>

@@ -752,46 +752,4 @@ body {
 }
 
 /* ===== Autocomplete Search Styles ===== */
-.autocomplete-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: #ffffff;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  z-index: 1000;
-  max-height: 200px;
-  overflow-y: auto;
-  box-shadow: var(--shadow);
-  margin-top: 4px;
-}
 
-.autocomplete-item {
-  padding: 10px 12px;
-  cursor: pointer;
-  font-size: 13px;
-  border-bottom: 1px solid #f1f5f9;
-  transition: background 0.15s ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.autocomplete-item:last-child {
-  border-bottom: none;
-}
-
-.autocomplete-item:hover {
-  background: var(--bg-main);
-}
-
-.autocomplete-item .item-title {
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.autocomplete-item .item-subtitle {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
