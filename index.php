@@ -95,6 +95,25 @@ header('Content-Security-Policy: frame-ancestors *');
                     </div>
 
                     <div class="form-group">
+                        <label for="crm_link_type">Link to CRM Entity</label>
+                        <select id="crm_link_type" name="crm_link_type" class="form-control">
+                            <option value="NONE">Do Not Link</option>
+                            <option value="LEAD">Link to Lead</option>
+                            <option value="DEAL">Link to Deal</option>
+                        </select>
+                    </div>
+
+                    <div id="crm_link_details" class="form-group" style="display: none;">
+                        <label for="crm_entity_id">CRM Entity ID</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="number" id="crm_entity_id" name="crm_entity_id" class="form-control" placeholder="Entity ID">
+                            <button type="button" id="btn_select_crm" class="btn btn-outline" style="white-space: nowrap; font-size: 13px; padding: 6px 12px; cursor: pointer; border: 1px solid var(--border-color); border-radius: 6px; background: #fff; font-weight: 500; display: none;">
+                                Select
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label for="client_name">Client Name</label>
                         <input type="text" id="client_name" name="client_name" class="form-control" placeholder="John Doe">
                     </div>

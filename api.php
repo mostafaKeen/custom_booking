@@ -322,7 +322,11 @@ try {
             }
 
             if (empty($entityTitle)) {
-                $entityTitle = ($entityType === 'LEAD' ? 'Lead' : 'Deal') . ' #' . $entityId;
+                if ($entityType === 'NONE' || $entityId == 0) {
+                    $entityTitle = 'Standalone Booking';
+                } else {
+                    $entityTitle = ($entityType === 'LEAD' ? 'Lead' : 'Deal') . ' #' . $entityId;
+                }
             }
 
             // Retrieve custom fields from request
@@ -402,53 +406,55 @@ try {
                 . "Specialist: {$staffName}\n"
                 . "Notes: {$notes}";
 
-            $bindings = [];
-            $communications = [];
+            $b24ActivityId = 0;
+            if ($entityId > 0 && $entityType !== 'NONE') {
+                $bindings = [];
+                $communications = [];
 
-            if ($entityType === 'LEAD') {
-                $bindings[] = ['OWNER_TYPE_ID' => 1, 'OWNER_ID' => $entityId];
-                if (!empty($clientPhone)) {
-                    $communications[] = [
-                        'VALUE' => $clientPhone,
-                        'ENTITY_TYPE_ID' => 1,
-                        'ENTITY_ID' => $entityId,
-                        'TYPE' => 'PHONE'
-                    ];
+                if ($entityType === 'LEAD') {
+                    $bindings[] = ['OWNER_TYPE_ID' => 1, 'OWNER_ID' => $entityId];
+                    if (!empty($clientPhone)) {
+                        $communications[] = [
+                            'VALUE' => $clientPhone,
+                            'ENTITY_TYPE_ID' => 1,
+                            'ENTITY_ID' => $entityId,
+                            'TYPE' => 'PHONE'
+                        ];
+                    }
+                } else {
+                    $bindings[] = ['OWNER_TYPE_ID' => 2, 'OWNER_ID' => $entityId];
+                    if (!empty($clientPhone)) {
+                        $communications[] = [
+                            'VALUE' => $clientPhone,
+                            'ENTITY_TYPE_ID' => 2,
+                            'ENTITY_ID' => $entityId,
+                            'TYPE' => 'PHONE'
+                        ];
+                    }
                 }
-            } else {
-                $bindings[] = ['OWNER_TYPE_ID' => 2, 'OWNER_ID' => $entityId];
-                if (!empty($clientPhone)) {
-                    $communications[] = [
-                        'VALUE' => $clientPhone,
-                        'ENTITY_TYPE_ID' => 2,
-                        'ENTITY_ID' => $entityId,
-                        'TYPE' => 'PHONE'
-                    ];
+
+                $activityFields = [
+                    'SUBJECT' => $activitySubject,
+                    'DESCRIPTION' => $activityDesc,
+                    'START_TIME' => date('c', $startTs),
+                    'END_TIME' => date('c', $endTs),
+                    'COMPLETED' => 'N',
+                    'RESPONSIBLE_ID' => $ownerId,
+                    'BINDINGS' => $bindings,
+                    'TYPE_ID' => 2, // Meeting
+                ];
+
+                if (!empty($communications)) {
+                    $activityFields['COMMUNICATIONS'] = $communications;
                 }
+
+                $activityRes = CRest::call('crm.activity.add', ['fields' => $activityFields]);
+                writeLog("STEP_3_CRM_ACTIVITY_ADD", $activityRes);
+                $b24ActivityId = $activityRes['result'] ?? 0;
             }
-
-            $activityFields = [
-                'SUBJECT' => $activitySubject,
-                'DESCRIPTION' => $activityDesc,
-                'START_TIME' => date('c', $startTs),
-                'END_TIME' => date('c', $endTs),
-                'COMPLETED' => 'N',
-                'RESPONSIBLE_ID' => $ownerId,
-                'BINDINGS' => $bindings,
-                'TYPE_ID' => 2, // Meeting
-            ];
-
-            if (!empty($communications)) {
-                $activityFields['COMMUNICATIONS'] = $communications;
-            }
-
-            $activityRes = CRest::call('crm.activity.add', ['fields' => $activityFields]);
-            writeLog("STEP_3_CRM_ACTIVITY_ADD", $activityRes);
-            $b24ActivityId = $activityRes['result'] ?? 0;
 
             // Step 4: Create Calendar Event (user calendar or company calendar)
             $b24CalendarEventId = 0;
-            $crmLink = ($entityType === 'LEAD') ? "L_" . $entityId : "D_" . $entityId;
 
             // Determine calendar type and owner ID based on target
             if ($calendarTarget === 'user') {
@@ -481,8 +487,12 @@ try {
                 'to' => date('d.m.Y H:i:s', $endTs),
                 'skip_time' => 'N',
                 'private_event' => 'N',
-                'crm_fields' => [$crmLink]
             ];
+
+            if ($entityId > 0 && $entityType !== 'NONE') {
+                $crmLink = ($entityType === 'LEAD' ? 'L_' : 'D_') . $entityId;
+                $eventParams['crm_fields'] = [$crmLink];
+            }
 
             if ($calSectionId > 0) {
                 $eventParams['section'] = $calSectionId;
@@ -560,7 +570,7 @@ try {
                 }
 
                 // Call externalData.set to link to the source Lead or Deal
-                if ($b24NativeBookingId > 0 && $entityId > 0) {
+                if ($b24NativeBookingId > 0 && $entityId > 0 && $entityType !== 'NONE') {
                     $extDataSetRes = CRest::call('booking.v1.booking.externalData.set', [
                         'bookingId' => $b24NativeBookingId,
                         'externalData' => [

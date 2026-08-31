@@ -60,6 +60,8 @@ function initBX24() {
 
                 BX24.resizeWindow(document.body.scrollWidth, Math.max(document.body.scrollHeight, 650));
                 
+                initCrmLinkFields();
+
                 if (placementInfo.entityId == 0) {
                     adjustLayoutForStandalone();
                 } else {
@@ -81,6 +83,8 @@ function initStandaloneMode() {
     placementInfo.entityType = urlParams.get('entity_type') || '';
     placementInfo.entityId = parseInt(urlParams.get('entity_id') || '0', 10);
 
+    initCrmLinkFields();
+
     if (placementInfo.entityId == 0) {
         adjustLayoutForStandalone();
     } else {
@@ -89,16 +93,16 @@ function initStandaloneMode() {
 }
 
 function adjustLayoutForStandalone() {
-    // Hide Left Form Column (since we are not inside a specific Lead/Deal card)
+    // Keep Left Form Column Visible (was previously hidden)
     const formCard = document.getElementById('booking_form').closest('.card');
     if (formCard) {
-        formCard.style.display = 'none';
+        formCard.style.display = 'block';
     }
 
-    // Make Right Bookings Column Full Width
+    // Adjust Grid Layout for Standalone Mode
     const grid = document.querySelector('.booking-grid');
     if (grid) {
-        grid.style.gridTemplateColumns = '1fr';
+        grid.style.gridTemplateColumns = '380px 1fr';
     }
 
     // Change title of bookings card
@@ -747,6 +751,81 @@ function loadSlots() {
         });
 }
 
+function initCrmLinkFields() {
+    var crmLinkType = document.getElementById('crm_link_type');
+    var crmEntityId = document.getElementById('crm_entity_id');
+    var crmLinkDetails = document.getElementById('crm_link_details');
+    var btnSelectCrm = document.getElementById('btn_select_crm');
+
+    if (!crmLinkType) return;
+
+    // Show BX24 selection button if BX24 SDK is loaded
+    if (typeof BX24 !== 'undefined' && BX24 !== null) {
+        if (btnSelectCrm) btnSelectCrm.style.display = 'block';
+    }
+
+    if (placementInfo.entityId > 0) {
+        // We are in LEAD or DEAL view - lock the fields
+        crmLinkType.value = placementInfo.entityType;
+        crmLinkType.disabled = true;
+        crmEntityId.value = placementInfo.entityId;
+        crmEntityId.disabled = true;
+        crmLinkDetails.style.display = 'block';
+        if (btnSelectCrm) btnSelectCrm.style.display = 'none'; // No need to select if locked
+    } else {
+        // Standalone mode - allow changing link type
+        crmLinkType.value = 'NONE';
+        crmLinkType.disabled = false;
+        crmEntityId.value = '';
+        crmEntityId.disabled = false;
+        crmLinkDetails.style.display = 'none';
+
+        // Listen for changes
+        crmLinkType.addEventListener('change', function() {
+            var val = this.value;
+            if (val === 'NONE') {
+                crmLinkDetails.style.display = 'none';
+                crmEntityId.required = false;
+            } else {
+                crmLinkDetails.style.display = 'block';
+                crmEntityId.required = true;
+            }
+        });
+
+        // Listen for CRM selection button click
+        if (btnSelectCrm) {
+            btnSelectCrm.addEventListener('click', function() {
+                var currentType = crmLinkType.value;
+                if (currentType === 'NONE') return;
+
+                BX24.selectCRM({
+                    entityType: [currentType.toLowerCase()],
+                    multiple: false,
+                    callback: function(data) {
+                        if (data && data[currentType.toLowerCase()] && data[currentType.toLowerCase()].length > 0) {
+                            var selected = data[currentType.toLowerCase()][0];
+                            // Clean up ID
+                            var selectedId = selected.id;
+                            if (typeof selectedId === 'string') {
+                                selectedId = selectedId.replace(/[^\d]/g, '');
+                            }
+                            crmEntityId.value = selectedId;
+                            
+                            // Auto fill client details if returned and empty
+                            if (selected.title) {
+                                var clientNameInput = document.getElementById('client_name');
+                                if (clientNameInput && !clientNameInput.value) {
+                                    clientNameInput.value = selected.title;
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+    }
+}
+
 function setupEventListeners() {
     document.getElementById('service_id').addEventListener('change', loadSlots);
     document.getElementById('staff_id').addEventListener('change', loadSlots);
@@ -784,10 +863,13 @@ function setupEventListeners() {
             return;
         }
 
+        var crmLinkTypeVal = document.getElementById('crm_link_type') ? document.getElementById('crm_link_type').value : 'NONE';
+        var crmEntityIdVal = document.getElementById('crm_entity_id') ? parseInt(document.getElementById('crm_entity_id').value || '0', 10) : 0;
+
         var formData = new FormData(this);
         formData.append('action', 'create_booking');
-        formData.append('entity_type', placementInfo.entityType);
-        formData.append('entity_id', placementInfo.entityId);
+        formData.append('entity_type', crmLinkTypeVal);
+        formData.append('entity_id', crmEntityIdVal);
         formData.append('start_time', selectedSlot);
 
         const postUrl = 'api.php?' + getAuthParams().substring(1);
@@ -802,7 +884,11 @@ function setupEventListeners() {
                 alert('Booking created successfully!');
                 document.getElementById('notes').value = '';
                 loadSlots();
-                loadEntityBookings();
+                if (crmLinkTypeVal === 'NONE' || crmEntityIdVal === 0) {
+                    loadAllBookings();
+                } else {
+                    loadEntityBookings();
+                }
             } else {
                 alert('Error creating booking: ' + data.message);
             }
