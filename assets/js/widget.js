@@ -755,74 +755,112 @@ function initCrmLinkFields() {
     var crmLinkType = document.getElementById('crm_link_type');
     var crmEntityId = document.getElementById('crm_entity_id');
     var crmLinkDetails = document.getElementById('crm_link_details');
-    var btnSelectCrm = document.getElementById('btn_select_crm');
+    var crmSearchInput = document.getElementById('crm_search_input');
+    var crmSearchResults = document.getElementById('crm_search_results');
 
-    if (!crmLinkType) return;
+    if (!crmLinkType || !crmSearchInput || !crmSearchResults) return;
 
-    // Show BX24 selection button if BX24 SDK is loaded
-    if (typeof BX24 !== 'undefined' && BX24 !== null) {
-        if (btnSelectCrm) btnSelectCrm.style.display = 'block';
-    }
+    var searchTimeout = null;
 
     if (placementInfo.entityId > 0) {
         // We are in LEAD or DEAL view - lock the fields
         crmLinkType.value = placementInfo.entityType;
         crmLinkType.disabled = true;
         crmEntityId.value = placementInfo.entityId;
-        crmEntityId.disabled = true;
         crmLinkDetails.style.display = 'block';
-        if (btnSelectCrm) btnSelectCrm.style.display = 'none'; // No need to select if locked
+        crmSearchInput.disabled = true;
+        
+        // In detail view, we can show the entity type and ID as the search value
+        crmSearchInput.value = placementInfo.entityType + ' #' + placementInfo.entityId;
     } else {
         // Standalone mode - allow changing link type
         crmLinkType.value = 'NONE';
         crmLinkType.disabled = false;
-        crmEntityId.value = '';
-        crmEntityId.disabled = false;
+        crmEntityId.value = '0';
+        crmSearchInput.value = '';
         crmLinkDetails.style.display = 'none';
 
         // Listen for changes
         crmLinkType.addEventListener('change', function() {
             var val = this.value;
+            crmEntityId.value = '0';
+            crmSearchInput.value = '';
+            crmSearchResults.innerHTML = '';
+            crmSearchResults.style.display = 'none';
+
             if (val === 'NONE') {
                 crmLinkDetails.style.display = 'none';
-                crmEntityId.required = false;
+                crmSearchInput.required = false;
             } else {
                 crmLinkDetails.style.display = 'block';
-                crmEntityId.required = true;
+                crmSearchInput.required = true;
+                crmSearchInput.placeholder = 'Type to search ' + (val === 'LEAD' ? 'Leads' : 'Deals') + '...';
             }
         });
 
-        // Listen for CRM selection button click
-        if (btnSelectCrm) {
-            btnSelectCrm.addEventListener('click', function() {
-                var currentType = crmLinkType.value;
-                if (currentType === 'NONE') return;
+        // Autocomplete search keyup event with debounce
+        crmSearchInput.addEventListener('input', function() {
+            var query = this.value.trim();
+            var type = crmLinkType.value;
 
-                BX24.selectCRM({
-                    entityType: [currentType.toLowerCase()],
-                    multiple: false,
-                    callback: function(data) {
-                        if (data && data[currentType.toLowerCase()] && data[currentType.toLowerCase()].length > 0) {
-                            var selected = data[currentType.toLowerCase()][0];
-                            // Clean up ID
-                            var selectedId = selected.id;
-                            if (typeof selectedId === 'string') {
-                                selectedId = selectedId.replace(/[^\d]/g, '');
-                            }
-                            crmEntityId.value = selectedId;
-                            
-                            // Auto fill client details if returned and empty
-                            if (selected.title) {
-                                var clientNameInput = document.getElementById('client_name');
-                                if (clientNameInput && !clientNameInput.value) {
-                                    clientNameInput.value = selected.title;
-                                }
-                            }
+            if (searchTimeout) clearTimeout(searchTimeout);
+            if (query.length < 2 || type === 'NONE') {
+                crmSearchResults.innerHTML = '';
+                crmSearchResults.style.display = 'none';
+                return;
+            }
+
+            searchTimeout = setTimeout(function() {
+                fetch('api.php?action=search_crm_entities&type=' + type.toLowerCase() + '&query=' + encodeURIComponent(query) + getAuthParams())
+                    .then(function(res) { return res.json(); })
+                    .then(function(data) {
+                        crmSearchResults.innerHTML = '';
+                        if (data.status === 'success' && data.results && data.results.length > 0) {
+                            data.results.forEach(function(item) {
+                                var div = document.createElement('div');
+                                div.className = 'autocomplete-item';
+                                
+                                var subtitle = 'ID: ' + item.id;
+                                if (item.name) subtitle += ' | Client: ' + item.name;
+                                if (item.phone) subtitle += ' (' + item.phone + ')';
+
+                                div.innerHTML = '<span class="item-title">' + item.title + '</span>' +
+                                                '<span class="item-subtitle">' + subtitle + '</span>';
+
+                                div.onclick = function() {
+                                    crmEntityId.value = item.id;
+                                    crmSearchInput.value = item.title;
+                                    crmSearchResults.innerHTML = '';
+                                    crmSearchResults.style.display = 'none';
+
+                                    // Auto fill client details
+                                    if (item.name) {
+                                        document.getElementById('client_name').value = item.name;
+                                    }
+                                    if (item.phone) {
+                                        document.getElementById('client_phone').value = item.phone;
+                                    }
+                                };
+                                crmSearchResults.appendChild(div);
+                            });
+                            crmSearchResults.style.display = 'block';
+                        } else {
+                            crmSearchResults.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b; text-align:center;">No results found</div>';
+                            crmSearchResults.style.display = 'block';
                         }
-                    }
-                });
-            });
-        }
+                    })
+                    .catch(function(err) {
+                        console.error('CRM search error:', err);
+                    });
+            }, 300);
+        });
+
+        // Hide search results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!crmSearchInput.contains(e.target) && !crmSearchResults.contains(e.target)) {
+                crmSearchResults.style.display = 'none';
+            }
+        });
     }
 }
 

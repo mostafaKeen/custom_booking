@@ -33,6 +33,62 @@ writeLog("API_REQUEST_START", [
 
 try {
     switch ($action) {
+        case 'search_crm_entities':
+            $type = strtolower($_REQUEST['type'] ?? 'lead');
+            $query = $_REQUEST['query'] ?? '';
+            $results = [];
+            if ($type === 'lead') {
+                $res = CRest::call('crm.lead.list', [
+                    'filter' => ['%TITLE' => $query],
+                    'select' => ['ID', 'TITLE', 'NAME', 'LAST_NAME', 'PHONE']
+                ]);
+                writeLog("SEARCH_CRM_LEADS_RESULT", ['query' => $query, 'res' => $res]);
+                if (!empty($res['result']) && is_array($res['result'])) {
+                    foreach ($res['result'] as $item) {
+                        $phone = '';
+                        if (!empty($item['PHONE']) && is_array($item['PHONE'])) {
+                            $phone = $item['PHONE'][0]['VALUE'] ?? '';
+                        }
+                        $results[] = [
+                            'id' => (int)$item['ID'],
+                            'title' => $item['TITLE'] ?? ('Lead #' . $item['ID']),
+                            'name' => trim(($item['NAME'] ?? '') . ' ' . ($item['LAST_NAME'] ?? '')),
+                            'phone' => $phone
+                        ];
+                    }
+                }
+            } else if ($type === 'deal') {
+                $res = CRest::call('crm.deal.list', [
+                    'filter' => ['%TITLE' => $query],
+                    'select' => ['ID', 'TITLE', 'CONTACT_ID']
+                ]);
+                writeLog("SEARCH_CRM_DEALS_RESULT", ['query' => $query, 'res' => $res]);
+                if (!empty($res['result']) && is_array($res['result'])) {
+                    foreach ($res['result'] as $item) {
+                        $contactId = (int)($item['CONTACT_ID'] ?? 0);
+                        $clientName = '';
+                        $clientPhone = '';
+                        if ($contactId > 0) {
+                            $contactRes = CRest::call('crm.contact.get', ['id' => $contactId]);
+                            if (!empty($contactRes['result'])) {
+                                $clientName = trim(($contactRes['result']['NAME'] ?? '') . ' ' . ($contactRes['result']['LAST_NAME'] ?? ''));
+                                if (!empty($contactRes['result']['PHONE']) && is_array($contactRes['result']['PHONE'])) {
+                                    $clientPhone = $contactRes['result']['PHONE'][0]['VALUE'] ?? '';
+                                }
+                            }
+                        }
+                        $results[] = [
+                            'id' => (int)$item['ID'],
+                            'title' => $item['TITLE'] ?? ('Deal #' . $item['ID']),
+                            'name' => $clientName,
+                            'phone' => $clientPhone
+                        ];
+                    }
+                }
+            }
+            sendJson(['status' => 'success', 'results' => $results]);
+            break;
+
         case 'get_services_and_staff':
             $services = $db->query("SELECT * FROM services ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
             $staff = $db->query("SELECT * FROM staff WHERE is_active = 1 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);

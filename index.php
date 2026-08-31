@@ -103,14 +103,11 @@ header('Content-Security-Policy: frame-ancestors *');
                         </select>
                     </div>
 
-                    <div id="crm_link_details" class="form-group" style="display: none;">
-                        <label for="crm_entity_id">CRM Entity ID</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="number" id="crm_entity_id" name="crm_entity_id" class="form-control" placeholder="Entity ID">
-                            <button type="button" id="btn_select_crm" class="btn btn-outline" style="white-space: nowrap; font-size: 13px; padding: 6px 12px; cursor: pointer; border: 1px solid var(--border-color); border-radius: 6px; background: #fff; font-weight: 500; display: none;">
-                                Select
-                            </button>
-                        </div>
+                    <div id="crm_link_details" class="form-group" style="display: none; position: relative;">
+                        <label for="crm_search_input">Search CRM Entity (by Title)</label>
+                        <input type="text" id="crm_search_input" class="form-control" placeholder="Type to search Lead or Deal..." autocomplete="off">
+                        <input type="hidden" id="crm_entity_id" name="crm_entity_id" value="0">
+                        <div id="crm_search_results" class="autocomplete-results" style="display: none;"></div>
                     </div>
 
                     <div class="form-group">
