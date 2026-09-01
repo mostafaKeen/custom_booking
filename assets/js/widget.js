@@ -647,14 +647,33 @@ function loadServicesAndStaff() {
                     staffSelect.innerHTML += '<option value="' + st.id + '">' + st.name + '</option>';
                 });
 
-                var b24ResourceSelect = document.getElementById('b24_resource_id');
-                b24ResourceSelect.innerHTML = '';
-                if (data.b24_resources && data.b24_resources.length > 0) {
-                    data.b24_resources.forEach(function(r) {
-                        b24ResourceSelect.innerHTML += '<option value="' + r.id + '">' + r.name + '</option>';
+                // Populate dynamic Booking Type options from entityTypeId 1088 fields
+                var bookingTypeSelect = document.getElementById('ufCrm29_1787324188722');
+                if (bookingTypeSelect && data.booking_type_options && data.booking_type_options.length > 0) {
+                    bookingTypeSelect.innerHTML = '';
+                    data.booking_type_options.forEach(function(bt) {
+                        var opt = document.createElement('option');
+                        opt.value = bt.ID;
+                        opt.textContent = bt.VALUE;
+                        bookingTypeSelect.appendChild(opt);
                     });
-                } else {
-                    b24ResourceSelect.innerHTML = '<option value="">No Active Bitrix24 Resources</option>';
+                }
+
+                // Populate dynamic Booking Resources options from entityTypeId 1088 fields
+                var b24ResourceSelect = document.getElementById('b24_resource_id');
+                if (b24ResourceSelect) {
+                    b24ResourceSelect.innerHTML = '';
+                    var resList = (data.resource_options && data.resource_options.length > 0) ? data.resource_options : data.b24_resources;
+                    if (resList && resList.length > 0) {
+                        resList.forEach(function(r) {
+                            var opt = document.createElement('option');
+                            opt.value = r.ID || r.id;
+                            opt.textContent = r.VALUE || r.name;
+                            b24ResourceSelect.appendChild(opt);
+                        });
+                    } else {
+                        b24ResourceSelect.innerHTML = '<option value="">No Active Bitrix24 Resources</option>';
+                    }
                 }
 
                 // Populate dynamic Car Reserved options from entityTypeId 1088 fields

@@ -57,7 +57,10 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                     <div class="form-group">
                         <label for="b24_resource_id">Bitrix24 Booking Resource(s) *</label>
                         <select id="b24_resource_id" name="b24_resource_id[]" class="form-control" required multiple style="height: 85px; padding: 6px;">
-                            <!-- Dynamically loaded resources from Bitrix24 -->
+                            <option value="699">Driver</option>
+                            <option value="701">Meeting Room</option>
+                            <option value="703">Photo Grapher</option>
+                            <option value="705">Video Grapher</option>
                         </select>
                         <small style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Hold Ctrl / Cmd to select multiple.</small>
                     </div>

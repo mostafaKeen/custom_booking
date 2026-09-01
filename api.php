@@ -126,22 +126,33 @@ try {
                 }
             }
 
-            // Fetch dynamic Car Reserved enumeration fields from SPA entityTypeId 1088
+            // Fetch dynamic SPA enumeration fields from entityTypeId 1088
             $carOptions = [];
+            $bookingTypeOptions = [];
+            $resourceOptions = [];
             $spaFieldsRes = CRest::call('crm.item.fields', ['entityTypeId' => 1088]);
             writeLog("REST_CALL_crm.item.fields_1088", $spaFieldsRes);
+
             if (!empty($spaFieldsRes['result']['fields'])) {
                 foreach ($spaFieldsRes['result']['fields'] as $key => $field) {
-                    if (strtolower(str_replace('_', '', $key)) === 'ufcrm291787324769682') {
+                    $cleanKey = strtolower(str_replace('_', '', $key));
+                    if ($cleanKey === 'ufcrm291787324769682') { // Car Reserved
                         if (!empty($field['items']) && is_array($field['items'])) {
                             $carOptions = $field['items'];
                         }
-                        break;
+                    } elseif ($cleanKey === 'ufcrm291787324188722') { // Booking Type
+                        if (!empty($field['items']) && is_array($field['items'])) {
+                            $bookingTypeOptions = $field['items'];
+                        }
+                    } elseif ($cleanKey === 'ufcrm291787324656') { // Resources
+                        if (!empty($field['items']) && is_array($field['items'])) {
+                            $resourceOptions = $field['items'];
+                        }
                     }
                 }
             }
 
-            // Fallback default car options if offline or not returned
+            // Fallback default options if offline or not returned
             if (empty($carOptions)) {
                 $carOptions = [
                     ['ID' => 707, 'VALUE' => 'No Car'],
@@ -151,13 +162,30 @@ try {
                     ['ID' => 755, 'VALUE' => 'MB Viano']
                 ];
             }
+            if (empty($bookingTypeOptions)) {
+                $bookingTypeOptions = [
+                    ['ID' => 685, 'VALUE' => 'Resource'],
+                    ['ID' => 687, 'VALUE' => 'Viewing'],
+                    ['ID' => 689, 'VALUE' => 'Meeting']
+                ];
+            }
+            if (empty($resourceOptions)) {
+                $resourceOptions = [
+                    ['ID' => 699, 'VALUE' => 'Driver'],
+                    ['ID' => 701, 'VALUE' => 'Meeting Room'],
+                    ['ID' => 703, 'VALUE' => 'Photo Grapher'],
+                    ['ID' => 705, 'VALUE' => 'Video Grapher']
+                ];
+            }
 
             sendJson([
                 'status' => 'success',
                 'services' => $services,
                 'staff' => $staff,
                 'b24_resources' => $b24Resources,
-                'car_options' => $carOptions
+                'car_options' => $carOptions,
+                'booking_type_options' => $bookingTypeOptions,
+                'resource_options' => $resourceOptions
             ]);
             break;
 
