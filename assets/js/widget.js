@@ -707,27 +707,34 @@ function handleDriverTripTypeRules() {
     var isDriverSelected = false;
     for (var i = 0; i < resourceSelect.options.length; i++) {
         var opt = resourceSelect.options[i];
-        if (opt.selected && opt.text.toLowerCase().indexOf('driver') >= 0) {
-            isDriverSelected = true;
-            break;
+        if (opt.selected) {
+            var valStr = String(opt.value || '');
+            var txtStr = (opt.text || opt.textContent || '').toLowerCase();
+            if (valStr === '699' || txtStr.indexOf('driver') >= 0) {
+                isDriverSelected = true;
+                break;
+            }
         }
     }
 
     if (isDriverSelected) {
-        // Driver selected: show Trip Type group, default to "Pick Up & Drop Off" (757) if empty
         tripTypeGroup.style.display = 'block';
         if (!tripTypeSelect.value) {
-            var defaultOpt = Array.from(tripTypeSelect.options).find(function(o) {
-                return o.value == '757' || o.text.toLowerCase().indexOf('pick up & drop off') >= 0;
-            });
-            if (defaultOpt) {
-                tripTypeSelect.value = defaultOpt.value;
-            } else if (tripTypeSelect.options.length > 0) {
-                tripTypeSelect.value = tripTypeSelect.options[0].value;
+            var defaultVal = '';
+            for (var j = 0; j < tripTypeSelect.options.length; j++) {
+                var o = tripTypeSelect.options[j];
+                var oTxt = (o.text || o.textContent || '').toLowerCase();
+                if (String(o.value) === '757' || oTxt.indexOf('pick up & drop off') >= 0 || oTxt.indexOf('pickup') >= 0) {
+                    defaultVal = o.value;
+                    break;
+                }
             }
+            if (!defaultVal && tripTypeSelect.options.length > 0) {
+                defaultVal = tripTypeSelect.options[0].value;
+            }
+            tripTypeSelect.value = defaultVal;
         }
     } else {
-        // Driver not selected: hide Trip Type group
         tripTypeGroup.style.display = 'none';
         tripTypeSelect.value = '';
     }
@@ -782,6 +789,8 @@ function setupEventListeners() {
     var b24ResSelect = document.getElementById('b24_resource_id');
     if (b24ResSelect) {
         b24ResSelect.addEventListener('change', handleDriverTripTypeRules);
+        b24ResSelect.addEventListener('click', handleDriverTripTypeRules);
+        b24ResSelect.addEventListener('input', handleDriverTripTypeRules);
     }
 
     document.getElementById('booking_form').addEventListener('submit', function(e) {
