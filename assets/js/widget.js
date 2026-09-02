@@ -676,21 +676,21 @@ function loadServicesAndStaff() {
                     }
                 }
 
-                // Populate dynamic Car Reserved options from entityTypeId 1088 fields
-                var carSelect = document.getElementById('ufCrm29_1787324769682');
-                if (carSelect && data.car_options && data.car_options.length > 0) {
-                    carSelect.innerHTML = '';
-                    data.car_options.forEach(function(c) {
+                // Populate dynamic Trip Type options from entityTypeId 1088 fields
+                var tripTypeSelect = document.getElementById('ufCrm29_1788299065411');
+                if (tripTypeSelect && data.trip_type_options && data.trip_type_options.length > 0) {
+                    tripTypeSelect.innerHTML = '';
+                    data.trip_type_options.forEach(function(tt) {
                         var opt = document.createElement('option');
-                        opt.value = c.ID;
-                        opt.textContent = c.VALUE;
-                        carSelect.appendChild(opt);
+                        opt.value = tt.ID;
+                        opt.textContent = tt.VALUE;
+                        tripTypeSelect.appendChild(opt);
                     });
                 }
 
                 document.getElementById('booking_date').value = new Date().toISOString().split('T')[0];
                 loadSlots();
-                handleCarReservationRules();
+                handleDriverTripTypeRules();
             }
         })
         .catch(function(err) {
@@ -698,10 +698,11 @@ function loadServicesAndStaff() {
         });
 }
 
-function handleCarReservationRules() {
+function handleDriverTripTypeRules() {
     var resourceSelect = document.getElementById('b24_resource_id');
-    var carSelect = document.getElementById('ufCrm29_1787324769682');
-    if (!resourceSelect || !carSelect || carSelect.options.length === 0) return;
+    var tripTypeGroup = document.getElementById('trip_type_group');
+    var tripTypeSelect = document.getElementById('ufCrm29_1788299065411');
+    if (!resourceSelect || !tripTypeGroup || !tripTypeSelect) return;
 
     var isDriverSelected = false;
     for (var i = 0; i < resourceSelect.options.length; i++) {
@@ -712,46 +713,23 @@ function handleCarReservationRules() {
         }
     }
 
-    var noCarOpt = null;
-    var firstVehicleOpt = null;
-
-    for (var j = 0; j < carSelect.options.length; j++) {
-        var cOpt = carSelect.options[j];
-        if (cOpt.text.toLowerCase().indexOf('no car') >= 0 || cOpt.value == '707') {
-            noCarOpt = cOpt;
-        } else if (!firstVehicleOpt) {
-            firstVehicleOpt = cOpt;
-        }
-    }
-
     if (isDriverSelected) {
-        // Driver selected: disable "No Car", enable all vehicles
-        for (var k = 0; k < carSelect.options.length; k++) {
-            var cOpt = carSelect.options[k];
-            if (cOpt === noCarOpt) {
-                cOpt.disabled = true;
-            } else {
-                cOpt.disabled = false;
-            }
-        }
-        if (!carSelect.value || (noCarOpt && carSelect.value === String(noCarOpt.value))) {
-            if (firstVehicleOpt) {
-                carSelect.value = firstVehicleOpt.value;
+        // Driver selected: show Trip Type group, default to "Pick Up & Drop Off" (757) if empty
+        tripTypeGroup.style.display = 'block';
+        if (!tripTypeSelect.value) {
+            var defaultOpt = Array.from(tripTypeSelect.options).find(function(o) {
+                return o.value == '757' || o.text.toLowerCase().indexOf('pick up & drop off') >= 0;
+            });
+            if (defaultOpt) {
+                tripTypeSelect.value = defaultOpt.value;
+            } else if (tripTypeSelect.options.length > 0) {
+                tripTypeSelect.value = tripTypeSelect.options[0].value;
             }
         }
     } else {
-        // Driver not selected: enable "No Car", disable vehicles
-        for (var k = 0; k < carSelect.options.length; k++) {
-            var cOpt = carSelect.options[k];
-            if (cOpt === noCarOpt) {
-                cOpt.disabled = false;
-            } else {
-                cOpt.disabled = true;
-            }
-        }
-        if (noCarOpt) {
-            carSelect.value = noCarOpt.value;
-        }
+        // Driver not selected: hide Trip Type group
+        tripTypeGroup.style.display = 'none';
+        tripTypeSelect.value = '';
     }
 }
 
@@ -803,7 +781,7 @@ function setupEventListeners() {
 
     var b24ResSelect = document.getElementById('b24_resource_id');
     if (b24ResSelect) {
-        b24ResSelect.addEventListener('change', handleCarReservationRules);
+        b24ResSelect.addEventListener('change', handleDriverTripTypeRules);
     }
 
     document.getElementById('booking_form').addEventListener('submit', function(e) {
@@ -813,9 +791,9 @@ function setupEventListeners() {
             return;
         }
 
-        // Validate Car Selection rules
-        var carSelect = document.getElementById('ufCrm29_1787324769682');
-        var carVal = carSelect ? carSelect.value : '';
+        // Validate Driver & Trip Type rules
+        var tripTypeSelect = document.getElementById('ufCrm29_1788299065411');
+        var tripVal = tripTypeSelect ? tripTypeSelect.value : '';
         var resSelect = document.getElementById('b24_resource_id');
         var isDriverSelected = false;
         for (var i = 0; i < resSelect.options.length; i++) {
@@ -825,20 +803,8 @@ function setupEventListeners() {
             }
         }
 
-        var noCarId = '707';
-        for (var j = 0; j < carSelect.options.length; j++) {
-            if (carSelect.options[j].text.toLowerCase().indexOf('no car') >= 0) {
-                noCarId = String(carSelect.options[j].value);
-                break;
-            }
-        }
-
-        if (isDriverSelected && carVal === noCarId) {
-            alert('When "Driver" is selected, you must choose a vehicle (e.g. Toyota Fortuner, Tahoe, Range Rover, MB Viano).');
-            return;
-        }
-        if (!isDriverSelected && carVal !== noCarId) {
-            alert('Vehicle reservation is only permitted when "Driver" is selected.');
+        if (isDriverSelected && !tripVal) {
+            alert('When "Driver" is selected, you must specify a Trip Type.');
             return;
         }
 

@@ -130,6 +130,7 @@ try {
             $carOptions = [];
             $bookingTypeOptions = [];
             $resourceOptions = [];
+            $tripTypeOptions = [];
             $spaFieldsRes = CRest::call('crm.item.fields', ['entityTypeId' => 1088]);
             writeLog("REST_CALL_crm.item.fields_1088", $spaFieldsRes);
 
@@ -147,6 +148,10 @@ try {
                     } elseif ($cleanKey === 'ufcrm291787324656') { // Resources
                         if (!empty($field['items']) && is_array($field['items'])) {
                             $resourceOptions = $field['items'];
+                        }
+                    } elseif ($cleanKey === 'ufcrm291788299065411') { // Trip Type
+                        if (!empty($field['items']) && is_array($field['items'])) {
+                            $tripTypeOptions = $field['items'];
                         }
                     }
                 }
@@ -177,6 +182,13 @@ try {
                     ['ID' => 705, 'VALUE' => 'Video Grapher']
                 ];
             }
+            if (empty($tripTypeOptions)) {
+                $tripTypeOptions = [
+                    ['ID' => 757, 'VALUE' => 'Pick Up & Drop Off'],
+                    ['ID' => 759, 'VALUE' => 'Pick Up'],
+                    ['ID' => 761, 'VALUE' => 'Drop Off']
+                ];
+            }
 
             sendJson([
                 'status' => 'success',
@@ -185,7 +197,8 @@ try {
                 'b24_resources' => $b24Resources,
                 'car_options' => $carOptions,
                 'booking_type_options' => $bookingTypeOptions,
-                'resource_options' => $resourceOptions
+                'resource_options' => $resourceOptions,
+                'trip_type_options' => $tripTypeOptions
             ]);
             break;
 
@@ -458,7 +471,7 @@ try {
 
             // Retrieve custom fields from request
             $bookingType = $_REQUEST['ufCrm29_1787324188722'] ?? [];
-            $carReserved = $_REQUEST['ufCrm29_1787324769682'] ?? '';
+            $tripType = $_REQUEST['ufCrm29_1788299065411'] ?? '';
 
             // Fetch the name of the Bitrix24 user who is creating this booking
             $createdByName = '';
@@ -503,22 +516,24 @@ try {
                 }
             }
 
-            // Enforce Car Reservation business rule
+            // Enforce Driver Trip Type business rule
             $isDriverSelected = in_array(699, $resourcesList);
-            if ($isDriverSelected && (int)$carReserved == 707) {
-                $carReserved = 709; // Default to Car 1
-            } elseif (!$isDriverSelected) {
-                $carReserved = 707; // Force No Car
+            if ($isDriverSelected) {
+                if (empty($tripType)) {
+                    $tripType = 757; // Default to Pick Up & Drop Off
+                }
+            } else {
+                $tripType = 0; // Not visible/applicable when Driver is not selected
             }
 
             // Step 2: Insert into local DB
-            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1787324769682, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?, ?)");
+            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1788299065411, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $entityType, $entityId, $entityTitle, $clientName, $clientPhone, $clientEmail,
                 $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes,
                 is_array($bookingType) ? implode(',', $bookingType) : $bookingType,
                 is_array($resourcesList) ? implode(',', $resourcesList) : $resourcesList,
-                (int)$carReserved,
+                (int)$tripType,
                 $createdByName
             ]);
             $bookingId = $db->lastInsertId();
@@ -740,8 +755,8 @@ try {
                 $spaFields['ufCrm29_1787324656'] = [intval($resourcesList)];
             }
 
-            if (!empty($carReserved)) {
-                $spaFields['ufCrm29_1787324769682'] = intval($carReserved);
+            if (!empty($tripType) && (int)$tripType > 0) {
+                $spaFields['ufCrm29_1788299065411'] = intval($tripType);
             }
 
             $spaRes = CRest::call('crm.item.add', [

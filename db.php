@@ -109,6 +109,10 @@ class DB {
         } catch (Exception $e) {}
 
         try {
+            $db->exec("ALTER TABLE bookings ADD COLUMN ufCrm29_1788299065411 INT DEFAULT 0");
+        } catch (Exception $e) {}
+
+        try {
             $db->exec("ALTER TABLE bookings ADD COLUMN created_by_name VARCHAR(255) DEFAULT ''");
         } catch (Exception $e) {}
 

@@ -82,14 +82,12 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label for="ufCrm29_1787324769682">Car Reserved *</label>
-                        <select id="ufCrm29_1787324769682" name="ufCrm29_1787324769682" class="form-control" required>
-                            <option value="707">No Car</option>
-                            <option value="709">Toyota Fortuner</option>
-                            <option value="711">Tahoe</option>
-                            <option value="713">Range Rover</option>
-                            <option value="755">MB Viano</option>
+                    <div class="form-group" id="trip_type_group" style="display: none;">
+                        <label for="ufCrm29_1788299065411">Trip Type</label>
+                        <select id="ufCrm29_1788299065411" name="ufCrm29_1788299065411" class="form-control">
+                            <option value="757">Pick Up & Drop Off</option>
+                            <option value="759">Pick Up</option>
+                            <option value="761">Drop Off</option>
                         </select>
                     </div>
 
