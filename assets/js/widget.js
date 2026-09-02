@@ -712,39 +712,36 @@ function handleDriverTripTypeRules() {
     var resourceSelect = document.getElementById('b24_resource_id');
     var tripTypeGroup = document.getElementById('trip_type_group');
     var tripTypeSelect = document.getElementById('ufCrm29_1788299065411');
-    if (!resourceSelect || !tripTypeGroup || !tripTypeSelect) return;
+    
+    if (!resourceSelect) { console.warn('[TripType] b24_resource_id NOT FOUND'); return; }
+    if (!tripTypeGroup) { console.warn('[TripType] trip_type_group NOT FOUND'); return; }
+    if (!tripTypeSelect) { console.warn('[TripType] ufCrm29_1788299065411 NOT FOUND'); return; }
 
     var isDriverSelected = false;
+    var allOptions = [];
     
-    // Method 1: Check selectedOptions
-    if (resourceSelect.selectedOptions && resourceSelect.selectedOptions.length > 0) {
-        for (var s = 0; s < resourceSelect.selectedOptions.length; s++) {
-            var sOpt = resourceSelect.selectedOptions[s];
-            var sVal = String(sOpt.value || '');
-            var sTxt = (sOpt.text || sOpt.textContent || '').toLowerCase();
-            if (sVal === '699' || sTxt.indexOf('driver') >= 0) {
+    for (var i = 0; i < resourceSelect.options.length; i++) {
+        var opt = resourceSelect.options[i];
+        allOptions.push({
+            value: opt.value,
+            text: opt.text || opt.textContent,
+            selected: opt.selected
+        });
+        if (opt.selected) {
+            var valStr = String(opt.value || '');
+            var txtStr = (opt.text || opt.textContent || '').toLowerCase();
+            if (valStr === '699' || txtStr.indexOf('driver') >= 0) {
                 isDriverSelected = true;
-                break;
             }
         }
     }
-
-    // Method 2: Check all options
-    if (!isDriverSelected) {
-        for (var i = 0; i < resourceSelect.options.length; i++) {
-            var opt = resourceSelect.options[i];
-            if (opt.selected) {
-                var valStr = String(opt.value || '');
-                var txtStr = (opt.text || opt.textContent || '').toLowerCase();
-                if (valStr === '699' || txtStr.indexOf('driver') >= 0) {
-                    isDriverSelected = true;
-                    break;
-                }
-            }
-        }
-    }
+    
+    console.log('[TripType] resourceSelect.selectedIndex:', resourceSelect.selectedIndex);
+    console.log('[TripType] allOptions:', JSON.stringify(allOptions));
+    console.log('[TripType] isDriverSelected:', isDriverSelected);
 
     if (isDriverSelected) {
+        console.log('[TripType] SHOWING trip_type_group');
         tripTypeGroup.style.display = 'block';
         if (!tripTypeSelect.value) {
             var defaultVal = '';
@@ -762,6 +759,7 @@ function handleDriverTripTypeRules() {
             tripTypeSelect.value = defaultVal;
         }
     } else {
+        console.log('[TripType] HIDING trip_type_group');
         tripTypeGroup.style.display = 'none';
         tripTypeSelect.value = '';
     }

@@ -175,6 +175,6 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
         </div>
     </div>
 
-    <script src="assets/js/widget.js"></script>
+    <script src="assets/js/widget.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>
