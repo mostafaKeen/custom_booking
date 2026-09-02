@@ -662,13 +662,23 @@ function loadServicesAndStaff() {
                 // Populate dynamic Booking Resources options from entityTypeId 1088 fields
                 var b24ResourceSelect = document.getElementById('b24_resource_id');
                 if (b24ResourceSelect) {
+                    var existingSelected = [];
+                    for (var k = 0; k < b24ResourceSelect.options.length; k++) {
+                        if (b24ResourceSelect.options[k].selected) {
+                            existingSelected.push(String(b24ResourceSelect.options[k].value));
+                        }
+                    }
+
                     b24ResourceSelect.innerHTML = '';
                     var resList = (data.resource_options && data.resource_options.length > 0) ? data.resource_options : data.b24_resources;
                     if (resList && resList.length > 0) {
-                        resList.forEach(function(r) {
+                        resList.forEach(function(r, idx) {
                             var opt = document.createElement('option');
                             opt.value = r.ID || r.id;
                             opt.textContent = r.VALUE || r.name;
+                            if (existingSelected.indexOf(String(opt.value)) >= 0 || (existingSelected.length === 0 && idx === 0)) {
+                                opt.selected = true;
+                            }
                             b24ResourceSelect.appendChild(opt);
                         });
                     } else {
@@ -705,14 +715,31 @@ function handleDriverTripTypeRules() {
     if (!resourceSelect || !tripTypeGroup || !tripTypeSelect) return;
 
     var isDriverSelected = false;
-    for (var i = 0; i < resourceSelect.options.length; i++) {
-        var opt = resourceSelect.options[i];
-        if (opt.selected) {
-            var valStr = String(opt.value || '');
-            var txtStr = (opt.text || opt.textContent || '').toLowerCase();
-            if (valStr === '699' || txtStr.indexOf('driver') >= 0) {
+    
+    // Method 1: Check selectedOptions
+    if (resourceSelect.selectedOptions && resourceSelect.selectedOptions.length > 0) {
+        for (var s = 0; s < resourceSelect.selectedOptions.length; s++) {
+            var sOpt = resourceSelect.selectedOptions[s];
+            var sVal = String(sOpt.value || '');
+            var sTxt = (sOpt.text || sOpt.textContent || '').toLowerCase();
+            if (sVal === '699' || sTxt.indexOf('driver') >= 0) {
                 isDriverSelected = true;
                 break;
+            }
+        }
+    }
+
+    // Method 2: Check all options
+    if (!isDriverSelected) {
+        for (var i = 0; i < resourceSelect.options.length; i++) {
+            var opt = resourceSelect.options[i];
+            if (opt.selected) {
+                var valStr = String(opt.value || '');
+                var txtStr = (opt.text || opt.textContent || '').toLowerCase();
+                if (valStr === '699' || txtStr.indexOf('driver') >= 0) {
+                    isDriverSelected = true;
+                    break;
+                }
             }
         }
     }
@@ -792,6 +819,9 @@ function setupEventListeners() {
         b24ResSelect.addEventListener('click', handleDriverTripTypeRules);
         b24ResSelect.addEventListener('input', handleDriverTripTypeRules);
     }
+    
+    // Polling backup to keep UI in sync
+    setInterval(handleDriverTripTypeRules, 300);
 
     document.getElementById('booking_form').addEventListener('submit', function(e) {
         e.preventDefault();
