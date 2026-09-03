@@ -766,13 +766,14 @@ function handleDriverTripTypeRules() {
 }
 
 function loadSlots() {
-    var serviceId = document.getElementById('service_id').value;
-    var staffId = document.getElementById('staff_id').value;
+    var serviceId = (document.getElementById('service_id') ? document.getElementById('service_id').value : '1') || '1';
+    var staffId = (document.getElementById('staff_id') ? document.getElementById('staff_id').value : '1') || '1';
     var date = document.getElementById('booking_date').value;
+    var duration = document.getElementById('slot_duration') ? document.getElementById('slot_duration').value : '30';
 
-    if (!serviceId || !staffId || !date) return;
+    if (!date) return;
 
-    fetch('api.php?action=get_slots&service_id=' + serviceId + '&staff_id=' + staffId + '&date=' + date + getAuthParams())
+    fetch('api.php?action=get_slots&service_id=' + serviceId + '&staff_id=' + staffId + '&date=' + date + '&duration_minutes=' + duration + getAuthParams())
         .then(function(res) { return res.json(); })
         .then(function(data) {
             var slotsContainer = document.getElementById('slots_container');
@@ -784,7 +785,7 @@ function loadSlots() {
                     var btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'slot-btn ' + (slot.available ? '' : 'disabled');
-                    btn.textContent = slot.display.split('-')[0].trim();
+                    btn.textContent = slot.display;
 
                     if (slot.available) {
                         btn.onclick = function() {
@@ -807,9 +808,15 @@ function loadSlots() {
 }
 
 function setupEventListeners() {
-    document.getElementById('service_id').addEventListener('change', loadSlots);
-    document.getElementById('staff_id').addEventListener('change', loadSlots);
+    var serviceEl = document.getElementById('service_id');
+    if (serviceEl) serviceEl.addEventListener('change', loadSlots);
+    var staffEl = document.getElementById('staff_id');
+    if (staffEl) staffEl.addEventListener('change', loadSlots);
+    
     document.getElementById('booking_date').addEventListener('change', loadSlots);
+    
+    var durationEl = document.getElementById('slot_duration');
+    if (durationEl) durationEl.addEventListener('change', loadSlots);
 
     var b24ResSelect = document.getElementById('b24_resource_id');
     if (b24ResSelect) {

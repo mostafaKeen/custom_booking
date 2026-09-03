@@ -44,15 +44,9 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
             <div class="card">
                 <h3 class="card-title">Schedule New Appointment</h3>
                 <form id="booking_form">
-                    <div class="form-group">
-                        <label for="service_id">Service / Appointment Type</label>
-                        <select id="service_id" name="service_id" class="form-control" required></select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="staff_id">Assigned Specialist (Local)</label>
-                        <select id="staff_id" name="staff_id" class="form-control" required></select>
-                    </div>
+                    <input type="hidden" id="service_id" name="service_id" value="1">
+                    <input type="hidden" id="staff_id" name="staff_id" value="1">
+                    <input type="hidden" id="calendar_target" name="calendar_target" value="user">
 
                     <div class="form-group">
                         <label for="b24_resource_id">Bitrix24 Booking Resource(s) *</label>
@@ -63,14 +57,6 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                             <option value="705">Video Grapher</option>
                         </select>
                         <small style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Hold Ctrl / Cmd to select multiple.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="calendar_target">Calendar Destination Sync</label>
-                        <select id="calendar_target" name="calendar_target" class="form-control">
-                            <option value="user">My Calendar</option>
-                            <option value="company_calendar">Public (Company Calendar)</option>
-                        </select>
                     </div>
 
                     <div class="form-group">
@@ -88,6 +74,21 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                             <option value="757">Pick Up & Drop Off</option>
                             <option value="759">Pick Up</option>
                             <option value="761">Drop Off</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="slot_duration">Slot Duration *</label>
+                        <select id="slot_duration" name="slot_duration" class="form-control">
+                            <option value="15">15 Minutes</option>
+                            <option value="30" selected>30 Minutes</option>
+                            <option value="45">45 Minutes</option>
+                            <option value="60">1 Hour</option>
+                            <option value="90">1.5 Hours</option>
+                            <option value="120">2 Hours</option>
+                            <option value="180">3 Hours</option>
+                            <option value="240">4 Hours</option>
+                            <option value="480">8 Hours (Full Working Day)</option>
                         </select>
                     </div>
 

@@ -204,14 +204,19 @@ try {
 
         case 'get_slots':
             $date = $_REQUEST['date'] ?? date('Y-m-d');
-            $serviceId = (int)($_REQUEST['service_id'] ?? 0);
-            $staffId = (int)($_REQUEST['staff_id'] ?? 0);
+            $serviceId = (int)($_REQUEST['service_id'] ?? 1);
+            $staffId = (int)($_REQUEST['staff_id'] ?? 1);
 
-            // Fetch service duration
-            $stmt = $db->prepare("SELECT duration_minutes FROM services WHERE id = ?");
-            $stmt->execute([$serviceId]);
-            $service = $stmt->fetch(PDO::FETCH_ASSOC);
-            $duration = $service ? (int)$service['duration_minutes'] : DEFAULT_SLOT_DURATION;
+            // Allow custom duration passed from frontend, or fallback to service duration
+            $customDuration = (int)($_REQUEST['duration_minutes'] ?? 0);
+            if ($customDuration > 0) {
+                $duration = $customDuration;
+            } else {
+                $stmt = $db->prepare("SELECT duration_minutes FROM services WHERE id = ?");
+                $stmt->execute([$serviceId]);
+                $service = $stmt->fetch(PDO::FETCH_ASSOC);
+                $duration = $service ? (int)$service['duration_minutes'] : DEFAULT_SLOT_DURATION;
+            }
 
             // Fetch staff working hours
             $stmt = $db->prepare("SELECT working_start, working_end FROM staff WHERE id = ?");
