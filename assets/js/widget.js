@@ -769,11 +769,17 @@ function loadSlots() {
     var serviceId = (document.getElementById('service_id') ? document.getElementById('service_id').value : '1') || '1';
     var staffId = (document.getElementById('staff_id') ? document.getElementById('staff_id').value : '1') || '1';
     var date = document.getElementById('booking_date').value;
-    var duration = document.getElementById('slot_duration') ? document.getElementById('slot_duration').value : '30';
+
+    var hrs = parseInt(document.getElementById('duration_hours') ? document.getElementById('duration_hours').value : '0', 10) || 0;
+    var mins = parseInt(document.getElementById('duration_minutes') ? document.getElementById('duration_minutes').value : '0', 10) || 0;
+    var totalMinutes = (hrs * 60) + mins;
+    if (totalMinutes <= 0) {
+        totalMinutes = 30; // fallback default
+    }
 
     if (!date) return;
 
-    fetch('api.php?action=get_slots&service_id=' + serviceId + '&staff_id=' + staffId + '&date=' + date + '&duration_minutes=' + duration + getAuthParams())
+    fetch('api.php?action=get_slots&service_id=' + serviceId + '&staff_id=' + staffId + '&date=' + date + '&duration_minutes=' + totalMinutes + getAuthParams())
         .then(function(res) { return res.json(); })
         .then(function(data) {
             var slotsContainer = document.getElementById('slots_container');
@@ -799,7 +805,7 @@ function loadSlots() {
                     slotsContainer.appendChild(btn);
                 });
             } else {
-                slotsContainer.innerHTML = '<p style="font-size:13px; color:#64748b;">No available slots for this date.</p>';
+                slotsContainer.innerHTML = '<p style="font-size:13px; color:#64748b;">No available slots for this date/duration.</p>';
             }
         })
         .catch(function(err) {
@@ -815,8 +821,10 @@ function setupEventListeners() {
     
     document.getElementById('booking_date').addEventListener('change', loadSlots);
     
-    var durationEl = document.getElementById('slot_duration');
-    if (durationEl) durationEl.addEventListener('change', loadSlots);
+    var applyBtn = document.getElementById('apply_duration_btn');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', loadSlots);
+    }
 
     var b24ResSelect = document.getElementById('b24_resource_id');
     if (b24ResSelect) {

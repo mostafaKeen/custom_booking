@@ -78,18 +78,20 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                     </div>
 
                     <div class="form-group">
-                        <label for="slot_duration">Slot Duration *</label>
-                        <select id="slot_duration" name="slot_duration" class="form-control">
-                            <option value="15">15 Minutes</option>
-                            <option value="30" selected>30 Minutes</option>
-                            <option value="45">45 Minutes</option>
-                            <option value="60">1 Hour</option>
-                            <option value="90">1.5 Hours</option>
-                            <option value="120">2 Hours</option>
-                            <option value="180">3 Hours</option>
-                            <option value="240">4 Hours</option>
-                            <option value="480">8 Hours (Full Working Day)</option>
-                        </select>
+                        <label>Slot Duration *</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <div style="flex: 1;">
+                                <small style="display: block; color: #64748b; margin-bottom: 2px;">Hours</small>
+                                <input type="number" id="duration_hours" name="duration_hours" class="form-control" min="0" max="24" value="0" placeholder="0">
+                            </div>
+                            <div style="flex: 1;">
+                                <small style="display: block; color: #64748b; margin-bottom: 2px;">Minutes</small>
+                                <input type="number" id="duration_minutes" name="duration_minutes" class="form-control" min="0" max="59" value="30" placeholder="30">
+                            </div>
+                            <div style="margin-top: 14px;">
+                                <button type="button" id="apply_duration_btn" class="btn btn-primary" style="padding: 8px 14px; white-space: nowrap; height: 38px;">Apply</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
