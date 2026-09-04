@@ -310,7 +310,21 @@ function placeEventCards(columns, timeSlots) {
         // Resource filter check
         if (resourceFilter !== 'ALL') {
             var resList = String(booking.ufCrm29_1787324656 || '').split(',').map(function(s) { return s.trim(); });
-            if (resList.indexOf(resourceFilter) < 0) return;
+            var filterIdStr = String(resourceFilter);
+            var isMatched = resList.indexOf(filterIdStr) >= 0;
+            
+            if (!isMatched) {
+                // Name-based fuzzy match fallback
+                var spaMap = { '699': ['driver'], '701': ['meeting room'], '703': ['photo grapher', 'photographer'], '705': ['video grapher', 'videographer'] };
+                if (spaMap[filterIdStr]) {
+                    resList.forEach(function(rVal) {
+                        if (spaMap[rVal]) {
+                            isMatched = true;
+                        }
+                    });
+                }
+            }
+            if (!isMatched) return;
         }
 
         // Determine which resource column(s) this booking belongs to
@@ -550,7 +564,6 @@ function showEventPopup(booking) {
                 '<div class="popup-row"><span class="popup-label">Status</span><span class="popup-value"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + statusInfo.color + ';margin-right:5px;"></span>' + escapeHtml(statusInfo.name) + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Client</span><span class="popup-value">' + escapeHtml(booking.client_name || 'N/A') + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Phone</span><span class="popup-value">' + escapeHtml(booking.client_phone || 'N/A') + '</span></div>' +
-                '<div class="popup-row"><span class="popup-label">Staff</span><span class="popup-value">' + escapeHtml(booking.staff_name || 'N/A') + '</span></div>' +
                 (booking.created_by_name ? '<div class="popup-row"><span class="popup-label">Created By</span><span class="popup-value">' + escapeHtml(booking.created_by_name) + '</span></div>' : '') +
                 (crmLinkHtml ? '<div class="popup-row"><span class="popup-label">CRM</span><span class="popup-value">' + crmLinkHtml + '</span></div>' : '') +
             '</div>' +
@@ -1023,7 +1036,6 @@ function renderBookingsList(data) {
                 '</div>' +
                 '<div class="booking-details">' +
                     '<strong>Date:</strong> ' + b.booking_date + ' (' + formatTime12(b.start_time) + ' - ' + formatTime12(b.end_time) + ')<br>' +
-                    '<strong>Staff:</strong> ' + b.staff_name + '<br>' +
                     '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
                     (specialistHtml ? '<div style="margin-top:2px; margin-bottom:2px;">' + specialistHtml + '</div>' : '') +
                     '<strong>Created By:</strong> ' + (b.created_by_name || 'N/A') + '<br>' +

@@ -580,35 +580,11 @@ try {
                 writeLog('USER_CURRENT_ERROR', ['error' => $e->getMessage()]);
             }
 
-            // Resolve dynamic B24 resources to the SPA Resources mapping
+            // Use selected resource IDs directly
             $resourcesList = [];
             if (!empty($resourceIds)) {
-                $resList = CRest::call('booking.v1.resource.list', []);
-                $resourceArray = $resList['result']['resource'] ?? ($resList['result']['resources'] ?? ($resList['result'] ?? []));
-                if (!is_array($resourceArray) || empty($resourceArray)) {
-                    $resCal = CRest::call('calendar.resource.list', []);
-                    $resourceArray = $resCal['result'] ?? [];
-                }
-                
-                $spaResourceMapping = [
-                    'driver' => 699,
-                    'meeting room' => 701,
-                    'photo grapher' => 703,
-                    'photographer' => 703,
-                    'video grapher' => 705,
-                    'videographer' => 705
-                ];
-
-                if (is_array($resourceArray)) {
-                    foreach ($resourceArray as $resItem) {
-                        $rId = (int)($resItem['id'] ?? ($resItem['ID'] ?? 0));
-                        if (in_array($rId, $resourceIds)) {
-                            $resName = strtolower(trim($resItem['name'] ?? ($resItem['NAME'] ?? '')));
-                            if (isset($spaResourceMapping[$resName])) {
-                                $resourcesList[] = $spaResourceMapping[$resName];
-                            }
-                        }
-                    }
+                foreach ($resourceIds as $rId) {
+                    $resourcesList[] = (int)$rId;
                 }
             }
 
