@@ -581,6 +581,8 @@ function showEventPopup(booking) {
             '<div class="popup-body">' +
                 '<div class="popup-row"><span class="popup-label">Status</span><span class="popup-value"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + statusInfo.color + ';margin-right:5px;"></span>' + escapeHtml(statusInfo.name) + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Resources</span><span class="popup-value" style="font-weight:600; color:#2563eb;">' + escapeHtml(getResourceNamesLabel(booking.ufCrm29_1787324656) || 'None') + '</span></div>' +
+                '<div class="popup-row"><span class="popup-label">Driver</span><span class="popup-value" style="font-weight:600; color:' + (booking.driver_name ? '#1e40af' : '#94a3b8') + ';">' + (booking.driver_name ? ('🚗 ' + escapeHtml(booking.driver_name)) : 'None Assigned') + '</span></div>' +
+                '<div class="popup-row"><span class="popup-label">Photographer</span><span class="popup-value" style="font-weight:600; color:' + (booking.photographer_name ? '#6b21a8' : '#94a3b8') + ';">' + (booking.photographer_name ? ('📷 ' + escapeHtml(booking.photographer_name)) : 'None Assigned') + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Client</span><span class="popup-value">' + escapeHtml(booking.client_name || 'N/A') + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Phone</span><span class="popup-value">' + escapeHtml(booking.client_phone || 'N/A') + '</span></div>' +
                 (booking.created_by_name ? '<div class="popup-row"><span class="popup-label">Created By</span><span class="popup-value">' + escapeHtml(booking.created_by_name) + '</span></div>' : '') +
@@ -1056,6 +1058,8 @@ function renderBookingsList(data) {
                 '<div class="booking-details">' +
                     '<strong>Date:</strong> ' + b.booking_date + ' (' + formatTime12(b.start_time) + ' - ' + formatTime12(b.end_time) + ')<br>' +
                     '<strong>Resources:</strong> <span style="color:#2563eb; font-weight:600;">' + escapeHtml(getResourceNamesLabel(b.ufCrm29_1787324656) || 'None') + '</span><br>' +
+                    '<strong>Driver:</strong> <span style="color:' + (b.driver_name ? '#1e40af' : '#94a3b8') + '; font-weight:600;">' + (b.driver_name ? ('🚗 ' + escapeHtml(b.driver_name)) : 'None Assigned') + '</span><br>' +
+                    '<strong>Photographer:</strong> <span style="color:' + (b.photographer_name ? '#6b21a8' : '#94a3b8') + '; font-weight:600;">' + (b.photographer_name ? ('📷 ' + escapeHtml(b.photographer_name)) : 'None Assigned') + '</span><br>' +
                     '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
                     (specialistHtml ? '<div style="margin-top:2px; margin-bottom:2px;">' + specialistHtml + '</div>' : '') +
                     '<strong>Created By:</strong> ' + (b.created_by_name || 'N/A') + '<br>' +
