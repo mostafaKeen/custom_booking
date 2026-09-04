@@ -46,16 +46,25 @@ function enrichBookingsWithSpaData($bookings) {
         $res = CRest::call('crm.item.list', [
             'entityTypeId' => 1088,
             'filter' => ['@id' => $spaIds],
-            'select' => ['id', 'stageId', 'ufCrm29_1788295852', 'ufCrm29_1788416337', 'ufCrm29_1787324769682']
+            'select' => ['id', 'stageId', 'ufCrm29_1787324656', 'ufCrm29_1788295852', 'ufCrm29_1788416337', 'ufCrm29_1787324769682']
         ]);
 
         if (!empty($res['result']['items'])) {
             foreach ($res['result']['items'] as $item) {
                 $itemId = (int)$item['id'];
                 $stageId = $item['stageId'] ?? '';
+                $resourcesVal = $item['ufCrm29_1787324656'] ?? null;
                 $driverId = (int)($item['ufCrm29_1788295852'] ?? 0);
                 $photographerId = (int)($item['ufCrm29_1788416337'] ?? 0);
                 $carId = $item['ufCrm29_1787324769682'] ?? '';
+
+                // Format resources string
+                $resStr = '';
+                if (is_array($resourcesVal)) {
+                    $resStr = implode(',', $resourcesVal);
+                } elseif (!empty($resourcesVal)) {
+                    $resStr = (string)$resourcesVal;
+                }
 
                 // Resolve user names if IDs exist
                 $driverName = '';
@@ -79,6 +88,7 @@ function enrichBookingsWithSpaData($bookings) {
 
                 $spaDataMap[$itemId] = [
                     'stageId' => $stageId,
+                    'resources' => $resStr,
                     'driverId' => $driverId,
                     'driverName' => $driverName,
                     'photographerId' => $photographerId,
@@ -95,6 +105,9 @@ function enrichBookingsWithSpaData($bookings) {
             $spaInfo = $spaDataMap[$spaId];
             if (!empty($spaInfo['stageId'])) {
                 $b['status'] = $spaInfo['stageId'];
+            }
+            if (!empty($spaInfo['resources'])) {
+                $b['ufCrm29_1787324656'] = $spaInfo['resources'];
             }
             $b['driver_id'] = $spaInfo['driverId'];
             $b['driver_name'] = $spaInfo['driverName'];

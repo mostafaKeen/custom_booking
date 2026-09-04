@@ -287,6 +287,27 @@ function renderCalendarGrid() {
     placeEventCards(columns, timeSlots);
 }
 
+var SPA_RESOURCE_NAMES = {
+    '699': 'Driver',
+    '701': 'Meeting Room',
+    '703': 'Photo Grapher',
+    '705': 'Video Grapher'
+};
+
+function getResourceNamesLabel(rawResources) {
+    if (!rawResources) return '';
+    var ids = String(rawResources).split(',').map(function(s) { return s.trim(); });
+    var names = [];
+    ids.forEach(function(id) {
+        if (SPA_RESOURCE_NAMES[id]) {
+            names.push(SPA_RESOURCE_NAMES[id]);
+        } else if (id) {
+            names.push(id);
+        }
+    });
+    return names.join(', ');
+}
+
 function applyCalendarFilters() {
     renderCalendarGrid();
 }
@@ -314,11 +335,12 @@ function placeEventCards(columns, timeSlots) {
             var isMatched = resList.indexOf(filterIdStr) >= 0;
             
             if (!isMatched) {
-                // Name-based fuzzy match fallback
-                var spaMap = { '699': ['driver'], '701': ['meeting room'], '703': ['photo grapher', 'photographer'], '705': ['video grapher', 'videographer'] };
-                if (spaMap[filterIdStr]) {
+                // Name-based match check
+                var targetName = (SPA_RESOURCE_NAMES[filterIdStr] || '').toLowerCase();
+                if (targetName) {
                     resList.forEach(function(rVal) {
-                        if (spaMap[rVal]) {
+                        var rName = (SPA_RESOURCE_NAMES[rVal] || rVal).toLowerCase();
+                        if (rName.indexOf(targetName) >= 0 || targetName.indexOf(rName) >= 0) {
                             isMatched = true;
                         }
                     });
@@ -344,16 +366,12 @@ function placeEventCards(columns, timeSlots) {
                 return;
             }
 
-            var spaMap = { '699': ['driver'], '701': ['meeting room'], '703': ['photo grapher', 'photographer'], '705': ['video grapher', 'videographer'] };
             bookingResourceIds.forEach(function(resId) {
-                if (spaMap[resId]) {
-                    spaMap[resId].forEach(function(name) {
-                        if (colName.indexOf(name) >= 0 || name.indexOf(colName) >= 0) {
-                            if (matchedColumns.indexOf(colIndex) < 0) {
-                                matchedColumns.push(colIndex);
-                            }
-                        }
-                    });
+                var resName = (SPA_RESOURCE_NAMES[resId] || resId).toLowerCase();
+                if (resName && (colName.indexOf(resName) >= 0 || resName.indexOf(colName) >= 0)) {
+                    if (matchedColumns.indexOf(colIndex) < 0) {
+                        matchedColumns.push(colIndex);
+                    }
                 }
             });
         });
@@ -562,6 +580,7 @@ function showEventPopup(booking) {
             '</div>' +
             '<div class="popup-body">' +
                 '<div class="popup-row"><span class="popup-label">Status</span><span class="popup-value"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + statusInfo.color + ';margin-right:5px;"></span>' + escapeHtml(statusInfo.name) + '</span></div>' +
+                '<div class="popup-row"><span class="popup-label">Resources</span><span class="popup-value" style="font-weight:600; color:#2563eb;">' + escapeHtml(getResourceNamesLabel(booking.ufCrm29_1787324656) || 'None') + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Client</span><span class="popup-value">' + escapeHtml(booking.client_name || 'N/A') + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Phone</span><span class="popup-value">' + escapeHtml(booking.client_phone || 'N/A') + '</span></div>' +
                 (booking.created_by_name ? '<div class="popup-row"><span class="popup-label">Created By</span><span class="popup-value">' + escapeHtml(booking.created_by_name) + '</span></div>' : '') +
@@ -1036,6 +1055,7 @@ function renderBookingsList(data) {
                 '</div>' +
                 '<div class="booking-details">' +
                     '<strong>Date:</strong> ' + b.booking_date + ' (' + formatTime12(b.start_time) + ' - ' + formatTime12(b.end_time) + ')<br>' +
+                    '<strong>Resources:</strong> <span style="color:#2563eb; font-weight:600;">' + escapeHtml(getResourceNamesLabel(b.ufCrm29_1787324656) || 'None') + '</span><br>' +
                     '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
                     (specialistHtml ? '<div style="margin-top:2px; margin-bottom:2px;">' + specialistHtml + '</div>' : '') +
                     '<strong>Created By:</strong> ' + (b.created_by_name || 'N/A') + '<br>' +
