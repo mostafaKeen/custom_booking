@@ -135,11 +135,11 @@ var RESOURCE_COLORS = {
 };
 
 var SPA_STAGES = {
-    'DT1088_37:NEW': { name: 'Request Made', color: '#22b9ff' },
-    'DT1088_37:PREPARATION': { name: 'Sales Admin Approval', color: '#88b9ff' },
-    'DT1088_37:CLIENT': { name: 'Executive Approval', color: '#10e5fc' },
-    'DT1088_37:SUCCESS': { name: 'Reserved', color: '#00ff00' },
-    'DT1088_37:FAIL': { name: 'Canceled', color: '#ff0000' }
+    'DT1088_37:NEW': { name: 'Requested (Pending)', color: '#ca8a04', bg: '#fef08a', text: '#854d0e', border: '#eab308', isApproved: false },
+    'DT1088_37:PREPARATION': { name: 'Sales Admin Review', color: '#d97706', bg: '#fef3c7', text: '#92400e', border: '#f59e0b', isApproved: false },
+    'DT1088_37:CLIENT': { name: 'Executive Review', color: '#eab308', bg: '#fef9c3', text: '#713f12', border: '#facc15', isApproved: false },
+    'DT1088_37:SUCCESS': { name: 'Approved & Reserved', color: '#15803d', bg: '#dcfce7', text: '#14532d', border: '#22c55e', isApproved: true },
+    'DT1088_37:FAIL': { name: 'Canceled', color: '#b91c1c', bg: '#fee2e2', text: '#7f1d1d', border: '#ef4444', isApproved: false }
 };
 
 function switchView(viewName) {
@@ -287,7 +287,14 @@ function renderCalendarGrid() {
     placeEventCards(columns, timeSlots);
 }
 
+function applyCalendarFilters() {
+    renderCalendarGrid();
+}
+
 function placeEventCards(columns, timeSlots) {
+    var statusFilter = document.getElementById('cal_filter_status') ? document.getElementById('cal_filter_status').value : 'ALL';
+    var resourceFilter = document.getElementById('cal_filter_resource') ? document.getElementById('cal_filter_resource').value : 'ALL';
+
     // Map column index to list of booking events placed in it
     var colEventsMap = {};
     columns.forEach(function(col, colIndex) {
@@ -295,6 +302,17 @@ function placeEventCards(columns, timeSlots) {
     });
 
     calBookings.forEach(function(booking) {
+        // Status filter check
+        if (statusFilter === 'REQUESTED' && SPA_STAGES[booking.status] && SPA_STAGES[booking.status].isApproved) return;
+        if (statusFilter === 'RESERVED' && SPA_STAGES[booking.status] && !SPA_STAGES[booking.status].isApproved) return;
+        if (statusFilter === 'CANCELED' && booking.status !== 'DT1088_37:FAIL') return;
+
+        // Resource filter check
+        if (resourceFilter !== 'ALL') {
+            var resList = String(booking.ufCrm29_1787324656 || '').split(',').map(function(s) { return s.trim(); });
+            if (resList.indexOf(resourceFilter) < 0) return;
+        }
+
         // Determine which resource column(s) this booking belongs to
         var bookingResourceIds = [];
         if (booking.ufCrm29_1787324656) {
@@ -384,7 +402,7 @@ function placeEventCards(columns, timeSlots) {
 
         // For each cluster, calculate columns layout (sub-columns)
         clusters.forEach(function(cluster) {
-            var subCols = []; // Stores end minutes of events in each sub-column
+            var subCols = [];
             cluster.forEach(function(ev) {
                 var assignedIndex = -1;
                 for (var i = 0; i < subCols.length; i++) {
@@ -414,8 +432,7 @@ function placeEventCards(columns, timeSlots) {
 
         events.forEach(function(ev) {
             var booking = ev.booking;
-            var serviceColor = booking.service_color || '#3b82f6';
-            var statusInfo = SPA_STAGES[booking.status] || { name: booking.status, color: '#64748b' };
+            var statusInfo = SPA_STAGES[booking.status] || { name: booking.status, color: '#ca8a04', bg: '#fef08a', text: '#854d0e', border: '#eab308', isApproved: false };
 
             var eventEl = document.createElement('div');
             eventEl.className = 'cal-event';
@@ -425,23 +442,39 @@ function placeEventCards(columns, timeSlots) {
             var leftPercent = widthPercent * ev.subColIndex;
 
             eventEl.style.top = (ev.topPx + 1) + 'px';
-            eventEl.style.height = Math.max(22, ev.heightPx - 2) + 'px';
+            eventEl.style.height = Math.max(26, ev.heightPx - 2) + 'px';
             eventEl.style.width = 'calc(' + widthPercent + '% - 4px)';
             eventEl.style.left = 'calc(' + leftPercent + '% + 2px)';
             eventEl.style.boxSizing = 'border-box';
-            eventEl.style.background = '#ffffff';
-            eventEl.style.borderLeftColor = serviceColor;
-            eventEl.style.color = '#1e293b';
+            eventEl.style.background = statusInfo.bg || '#fef08a';
+            eventEl.style.borderLeft = '4px solid ' + (statusInfo.border || '#eab308');
+            eventEl.style.color = statusInfo.text || '#854d0e';
 
             var clientDisplay = booking.client_name || 'N/A';
             var createdBy = booking.created_by_name || '';
 
+            // Specialist badge details
+            var specialistBadge = '';
+            if (booking.driver_name) {
+                specialistBadge += '<div style="font-size:9px; font-weight:700; color:#1e40af; margin-top:2px;">🚗 Driver: ' + escapeHtml(booking.driver_name) + '</div>';
+            }
+            if (booking.photographer_name) {
+                specialistBadge += '<div style="font-size:9px; font-weight:700; color:#6b21a8; margin-top:2px;">📷 Photographer: ' + escapeHtml(booking.photographer_name) + '</div>';
+            }
+
+            var overbookTag = ev.totalSubCols > 1 ? '<span style="background:#ef4444; color:#fff; font-size:8px; padding:1px 4px; border-radius:3px; font-weight:bold; margin-left:4px;">Overbooked</span>' : '';
+
             eventEl.innerHTML =
-                '<div class="cal-event-title" style="font-weight: 700; color:' + serviceColor + ';">' + escapeHtml(booking.service_name || 'Booking') + '</div>' +
-                '<div class="cal-event-time" style="font-weight: 500;">' + formatTime12(booking.start_time) + ' – ' + formatTime12(booking.end_time) + '</div>' +
-                '<div class="cal-event-client">👤 ' + escapeHtml(clientDisplay) + '</div>' +
-                (createdBy ? '<div class="cal-event-staff">By: ' + escapeHtml(createdBy) + '</div>' : '') +
-                '<div style="margin-top:2px; display:flex; align-items:center; gap:3px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + statusInfo.color + ';"></span><span style="font-size:8px;opacity:0.8;font-weight:600;">' + escapeHtml(statusInfo.name) + '</span></div>';
+                '<div class="cal-event-title" style="font-weight: 700; display:flex; align-items:center; justify-content:space-between;">' + 
+                    '<span>' + escapeHtml(booking.service_name || 'Booking') + '</span>' + overbookTag + 
+                '</div>' +
+                '<div class="cal-event-time" style="font-weight: 600; font-size:10px;">' + formatTime12(booking.start_time) + ' – ' + formatTime12(booking.end_time) + '</div>' +
+                '<div class="cal-event-client" style="font-size:10px;">👤 ' + escapeHtml(clientDisplay) + '</div>' +
+                specialistBadge +
+                '<div style="margin-top:2px; display:flex; align-items:center; gap:3px;">' +
+                    '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + statusInfo.color + ';"></span>' +
+                    '<span style="font-size:9px;font-weight:700;">' + escapeHtml(statusInfo.name) + '</span>' +
+                '</div>';
 
             eventEl.onclick = function(e) {
                 e.stopPropagation();
@@ -932,7 +965,6 @@ function renderBookingsList(data) {
 
     if (data.status === 'success' && data.bookings.length > 0) {
         data.bookings.forEach(function(b) {
-            var statusClass = 'status-' + b.status.toLowerCase();
             var item = document.createElement('div');
             item.className = 'booking-item';
             
@@ -955,28 +987,29 @@ function renderBookingsList(data) {
                     displayTitle + '</a>';
             }
 
-            var spaStages = {
-                'DT1088_37:NEW': { name: 'Request Made', color: '#22b9ff' },
-                'DT1088_37:PREPARATION': { name: 'Sales Admin Approval', color: '#88b9ff' },
-                'DT1088_37:CLIENT': { name: 'Executive Approval', color: '#10e5fc' },
-                'DT1088_37:SUCCESS': { name: 'Reserved', color: '#00ff00' },
-                'DT1088_37:FAIL': { name: 'Canceled', color: '#ff0000' }
-            };
-
             var currentStatusKey = b.status;
             if (currentStatusKey === 'Scheduled') currentStatusKey = 'DT1088_37:NEW';
             if (currentStatusKey === 'Confirmed') currentStatusKey = 'DT1088_37:PREPARATION';
             if (currentStatusKey === 'Completed') currentStatusKey = 'DT1088_37:SUCCESS';
             if (currentStatusKey === 'Cancelled') currentStatusKey = 'DT1088_37:FAIL';
 
-            var currentStage = spaStages[currentStatusKey] || { name: b.status, color: '#64748b' };
-            var statusBadge = '<span class="status-pill" style="background-color: ' + currentStage.color + '20; color: ' + currentStage.color + '; border: 1px solid ' + currentStage.color + '40; font-size:11px; padding:3px 8px; border-radius:4px; font-weight:bold;">' + currentStage.name + '</span>';
+            var currentStage = SPA_STAGES[currentStatusKey] || { name: b.status, color: '#ca8a04', bg: '#fef08a', text: '#854d0e', border: '#eab308' };
+            var statusBadge = '<span class="status-pill" style="background-color: ' + currentStage.bg + '; color: ' + currentStage.text + '; border: 1px solid ' + currentStage.border + '; font-size:11px; padding:3px 8px; border-radius:4px; font-weight:bold;">' + currentStage.name + '</span>';
+
+            // Specialist assignment badges
+            var specialistHtml = '';
+            if (b.driver_name) {
+                specialistHtml += '<div style="margin-top:4px; font-size:12px; font-weight:700; color:#1e40af; background:#eff6ff; padding:3px 8px; border-radius:4px; display:inline-block; margin-right:6px; border:1px solid #bfdbfe;">🚗 Driver: ' + escapeHtml(b.driver_name) + '</div>';
+            }
+            if (b.photographer_name) {
+                specialistHtml += '<div style="margin-top:4px; font-size:12px; font-weight:700; color:#6b21a8; background:#fdf4ff; padding:3px 8px; border-radius:4px; display:inline-block; border:1px solid #f5d0fe;">📷 Photographer: ' + escapeHtml(b.photographer_name) + '</div>';
+            }
 
             var buttonsHtml = '';
-            Object.keys(spaStages).forEach(function(stageId) {
+            Object.keys(SPA_STAGES).forEach(function(stageId) {
                 if (currentStatusKey !== stageId) {
-                    var stage = spaStages[stageId];
-                    buttonsHtml += '<button class="btn btn-outline btn-sm" style="border-color: ' + stage.color + '; color: ' + stage.color + '; margin-right: 6px; margin-bottom: 6px; background: transparent; font-weight: 600; cursor: pointer; transition: all 0.2s;" onclick="updateStatus(' + b.id + ', \'' + stageId + '\')">' + stage.name + '</button>';
+                    var stage = SPA_STAGES[stageId];
+                    buttonsHtml += '<button class="btn btn-outline btn-sm" style="border-color: ' + stage.border + '; color: ' + stage.text + '; margin-right: 6px; margin-bottom: 6px; background: ' + stage.bg + '; font-weight: 600; cursor: pointer; transition: all 0.2s;" onclick="updateStatus(' + b.id + ', \'' + stageId + '\')">' + stage.name + '</button>';
                 }
             });
 
@@ -989,9 +1022,10 @@ function renderBookingsList(data) {
                     statusBadge +
                 '</div>' +
                 '<div class="booking-details">' +
-                    '<strong>Date:</strong> ' + b.booking_date + ' (' + b.start_time + ' - ' + b.end_time + ')<br>' +
+                    '<strong>Date:</strong> ' + b.booking_date + ' (' + formatTime12(b.start_time) + ' - ' + formatTime12(b.end_time) + ')<br>' +
                     '<strong>Staff:</strong> ' + b.staff_name + '<br>' +
                     '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
+                    (specialistHtml ? '<div style="margin-top:2px; margin-bottom:2px;">' + specialistHtml + '</div>' : '') +
                     '<strong>Created By:</strong> ' + (b.created_by_name || 'N/A') + '<br>' +
                     '<strong>Target Calendar:</strong> ' + (b.calendar_target === 'user' ? 'My Calendar' : (b.calendar_target === 'company_calendar' ? 'Public (Company Calendar)' : b.calendar_target)) +
                 '</div>' +

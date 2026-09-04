@@ -147,6 +147,47 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
 
                 <!-- Calendar View (shown in standalone mode) -->
                 <div id="calendar_view" style="display:none;">
+                    <!-- Filter Controls & Legend -->
+                    <div class="calendar-filters" style="display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 2px; display: block;">Status Filter</label>
+                                <select id="cal_filter_status" onchange="applyCalendarFilters()" class="form-control" style="font-size: 12px; padding: 4px 8px; height: 32px;">
+                                    <option value="ALL">All Statuses</option>
+                                    <option value="REQUESTED">🟡 Requested (Yellow)</option>
+                                    <option value="RESERVED">🟢 Reserved & Approved (Green)</option>
+                                    <option value="CANCELED">🔴 Canceled (Red)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 2px; display: block;">Resource Filter</label>
+                                <select id="cal_filter_resource" onchange="applyCalendarFilters()" class="form-control" style="font-size: 12px; padding: 4px 8px; height: 32px;">
+                                    <option value="ALL">All Resources</option>
+                                    <option value="699">Driver</option>
+                                    <option value="701">Meeting Room</option>
+                                    <option value="703">Photo Grapher</option>
+                                    <option value="705">Video Grapher</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Legend -->
+                        <div style="display: flex; gap: 12px; align-items: center; font-size: 11px; font-weight: 600;">
+                            <span style="display: inline-flex; align-items: center; gap: 4px;">
+                                <span style="width: 10px; height: 10px; border-radius: 50%; background: #facc15; border: 1px solid #ca8a04;"></span>
+                                Requested (Pending)
+                            </span>
+                            <span style="display: inline-flex; align-items: center; gap: 4px;">
+                                <span style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; border: 1px solid #15803d;"></span>
+                                Reserved (Approved)
+                            </span>
+                            <span style="display: inline-flex; align-items: center; gap: 4px;">
+                                <span style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444; border: 1px solid #b91c1c;"></span>
+                                Canceled
+                            </span>
+                        </div>
+                    </div>
+
                     <!-- Calendar navigation bar -->
                     <div class="calendar-nav">
                         <button type="button" class="cal-nav-btn" id="cal_prev" onclick="calNavigate(-1)">

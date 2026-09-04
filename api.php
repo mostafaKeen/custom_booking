@@ -27,6 +27,93 @@ function sendJson($data) {
     exit;
 }
 
+function enrichBookingsWithSpaData($bookings) {
+    if (empty($bookings)) return [];
+    
+    // Collect all spa item IDs
+    $spaIds = [];
+    foreach ($bookings as $b) {
+        if (!empty($b['b24_spa_item_id'])) {
+            $spaIds[] = (int)$b['b24_spa_item_id'];
+        }
+    }
+
+    $spaDataMap = [];
+    $userCache = [];
+
+    if (!empty($spaIds)) {
+        // Query Bitrix24 SPA items
+        $res = CRest::call('crm.item.list', [
+            'entityTypeId' => 1088,
+            'filter' => ['@id' => $spaIds],
+            'select' => ['id', 'stageId', 'ufCrm29_1788295852', 'ufCrm29_1788416337', 'ufCrm29_1787324769682']
+        ]);
+
+        if (!empty($res['result']['items'])) {
+            foreach ($res['result']['items'] as $item) {
+                $itemId = (int)$item['id'];
+                $stageId = $item['stageId'] ?? '';
+                $driverId = (int)($item['ufCrm29_1788295852'] ?? 0);
+                $photographerId = (int)($item['ufCrm29_1788416337'] ?? 0);
+                $carId = $item['ufCrm29_1787324769682'] ?? '';
+
+                // Resolve user names if IDs exist
+                $driverName = '';
+                $photographerName = '';
+
+                if ($driverId > 0) {
+                    if (!isset($userCache[$driverId])) {
+                        $uRes = CRest::call('user.get', ['ID' => $driverId]);
+                        $userCache[$driverId] = !empty($uRes['result'][0]) ? trim(($uRes['result'][0]['NAME'] ?? '') . ' ' . ($uRes['result'][0]['LAST_NAME'] ?? '')) : "Employee #{$driverId}";
+                    }
+                    $driverName = $userCache[$driverId];
+                }
+
+                if ($photographerId > 0) {
+                    if (!isset($userCache[$photographerId])) {
+                        $uRes = CRest::call('user.get', ['ID' => $photographerId]);
+                        $userCache[$photographerId] = !empty($uRes['result'][0]) ? trim(($uRes['result'][0]['NAME'] ?? '') . ' ' . ($uRes['result'][0]['LAST_NAME'] ?? '')) : "Employee #{$photographerId}";
+                    }
+                    $photographerName = $userCache[$photographerId];
+                }
+
+                $spaDataMap[$itemId] = [
+                    'stageId' => $stageId,
+                    'driverId' => $driverId,
+                    'driverName' => $driverName,
+                    'photographerId' => $photographerId,
+                    'photographerName' => $photographerName,
+                    'carId' => $carId
+                ];
+            }
+        }
+    }
+
+    foreach ($bookings as &$b) {
+        $spaId = (int)($b['b24_spa_item_id'] ?? 0);
+        if ($spaId > 0 && isset($spaDataMap[$spaId])) {
+            $spaInfo = $spaDataMap[$spaId];
+            if (!empty($spaInfo['stageId'])) {
+                $b['status'] = $spaInfo['stageId'];
+            }
+            $b['driver_id'] = $spaInfo['driverId'];
+            $b['driver_name'] = $spaInfo['driverName'];
+            $b['photographer_id'] = $spaInfo['photographerId'];
+            $b['photographer_name'] = $spaInfo['photographerName'];
+            $b['car_id'] = $spaInfo['carId'];
+        } else {
+            $b['driver_id'] = 0;
+            $b['driver_name'] = '';
+            $b['photographer_id'] = 0;
+            $b['photographer_name'] = '';
+            $b['car_id'] = '';
+        }
+    }
+    unset($b);
+
+    return $bookings;
+}
+
 writeLog("API_REQUEST_START", [
     'action' => $action,
     'method' => $_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN',
@@ -227,7 +314,7 @@ try {
             $workEnd = $staffInfo['working_end'] ?? DEFAULT_WORKING_END;
 
             // Fetch existing bookings for this staff on this date
-            $stmt = $db->prepare("SELECT start_time, end_time FROM bookings WHERE staff_id = ? AND booking_date = ? AND status != 'Cancelled'");
+            $stmt = $db->prepare("SELECT start_time, end_time FROM bookings WHERE staff_id = ? AND booking_date = ? AND status != 'Cancelled' AND status != 'DT1088_37:FAIL'");
             $stmt->execute([$staffId, $date]);
             $existingBookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -241,22 +328,24 @@ try {
                 $slotEndStr = date('H:i:s', $currentSec + ($duration * 60));
                 $slotDisplay = date('h:i A', $currentSec) . ' - ' . date('h:i A', $currentSec + ($duration * 60));
 
-                // Check clash with existing bookings
-                $isClash = false;
+                // Check count of existing overlapping bookings for overbooking indicator
+                $overlapCount = 0;
                 foreach ($existingBookings as $b) {
                     $bStart = strtotime($date . ' ' . $b['start_time']);
                     $bEnd = strtotime($date . ' ' . $b['end_time']);
                     if ($currentSec < $bEnd && ($currentSec + ($duration * 60)) > $bStart) {
-                        $isClash = true;
-                        break;
+                        $overlapCount++;
                     }
                 }
 
+                // Overbooking is enabled: slots are ALWAYS available!
                 $slots[] = [
                     'start_time' => $slotStartStr,
                     'end_time' => $slotEndStr,
                     'display' => $slotDisplay,
-                    'available' => !$isClash
+                    'available' => true,
+                    'is_occupied' => ($overlapCount > 0),
+                    'overlap_count' => $overlapCount
                 ];
 
                 $currentSec += ($duration + DEFAULT_BUFFER_TIME) * 60;
@@ -272,6 +361,7 @@ try {
                                   LEFT JOIN staff st ON b.staff_id = st.id 
                                   ORDER BY b.booking_date DESC, b.start_time DESC");
             $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $bookings = enrichBookingsWithSpaData($bookings);
             sendJson(['status' => 'success', 'bookings' => $bookings]);
             break;
 
@@ -287,6 +377,7 @@ try {
                                   ORDER BY b.booking_date ASC, b.start_time ASC");
             $stmt->execute([$startDate, $endDate]);
             $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $bookings = enrichBookingsWithSpaData($bookings);
 
             // Fetch B24 resources for column headers
             $b24Resources = [];
