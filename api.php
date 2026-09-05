@@ -629,9 +629,14 @@ try {
                 $tripType = 0; // Not visible/applicable when Driver is not selected
             }
 
-            // Retrieve address fields
-            $transferFrom = trim($_REQUEST['ufCrm29_1788553737348'] ?? '');
-            $transferTo = trim($_REQUEST['ufCrm29_1788553748580'] ?? '');
+            // Retrieve address fields (only applicable when Driver resource is selected)
+            if ($isDriverSelected) {
+                $transferFrom = trim($_REQUEST['ufCrm29_1788553737348'] ?? '');
+                $transferTo = trim($_REQUEST['ufCrm29_1788553748580'] ?? '');
+            } else {
+                $transferFrom = '';
+                $transferTo = '';
+            }
 
             // Step 2: Insert into local DB
             $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1788299065411, created_by_name, ufCrm29_1788553737348, ufCrm29_1788553748580) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?, ?, ?, ?)");

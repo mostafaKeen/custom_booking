@@ -834,6 +834,10 @@ function handleDriverTripTypeRules() {
     var resourceSelect = document.getElementById('b24_resource_id');
     var tripTypeGroup = document.getElementById('trip_type_group');
     var tripTypeSelect = document.getElementById('ufCrm29_1788299065411');
+    var transferFromGroup = document.getElementById('transfer_from_group');
+    var transferToGroup = document.getElementById('transfer_to_group');
+    var transferFromInput = document.getElementById('ufCrm29_1788553737348');
+    var transferToInput = document.getElementById('ufCrm29_1788553748580');
     
     if (!resourceSelect) { console.warn('[TripType] b24_resource_id NOT FOUND'); return; }
     if (!tripTypeGroup) { console.warn('[TripType] trip_type_group NOT FOUND'); return; }
@@ -857,14 +861,12 @@ function handleDriverTripTypeRules() {
             }
         }
     }
-    
-    console.log('[TripType] resourceSelect.selectedIndex:', resourceSelect.selectedIndex);
-    console.log('[TripType] allOptions:', JSON.stringify(allOptions));
-    console.log('[TripType] isDriverSelected:', isDriverSelected);
 
     if (isDriverSelected) {
-        console.log('[TripType] SHOWING trip_type_group');
         tripTypeGroup.style.display = 'block';
+        if (transferFromGroup) transferFromGroup.style.display = 'block';
+        if (transferToGroup) transferToGroup.style.display = 'block';
+
         if (!tripTypeSelect.value) {
             var defaultVal = '';
             for (var j = 0; j < tripTypeSelect.options.length; j++) {
@@ -881,9 +883,12 @@ function handleDriverTripTypeRules() {
             tripTypeSelect.value = defaultVal;
         }
     } else {
-        console.log('[TripType] HIDING trip_type_group');
         tripTypeGroup.style.display = 'none';
         tripTypeSelect.value = '';
+        if (transferFromGroup) transferFromGroup.style.display = 'none';
+        if (transferToGroup) transferToGroup.style.display = 'none';
+        if (transferFromInput) transferFromInput.value = '';
+        if (transferToInput) transferToInput.value = '';
     }
 }
 

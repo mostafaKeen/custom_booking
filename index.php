@@ -118,12 +118,12 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                         <input type="text" id="client_phone" name="client_phone" class="form-control" placeholder="+123456789">
                     </div>
 
-                    <div class="form-group" id="transfer_from_group">
+                    <div class="form-group" id="transfer_from_group" style="display: none;">
                         <label for="ufCrm29_1788553737348">Transfer From (Address)</label>
                         <input type="text" id="ufCrm29_1788553737348" name="ufCrm29_1788553737348" class="form-control" placeholder="Pickup Address / Location">
                     </div>
 
-                    <div class="form-group" id="transfer_to_group">
+                    <div class="form-group" id="transfer_to_group" style="display: none;">
                         <label for="ufCrm29_1788553748580">Transfer To (Address)</label>
                         <input type="text" id="ufCrm29_1788553748580" name="ufCrm29_1788553748580" class="form-control" placeholder="Drop-off Address / Destination">
                     </div>
