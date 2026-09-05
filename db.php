@@ -116,6 +116,14 @@ class DB {
             $db->exec("ALTER TABLE bookings ADD COLUMN created_by_name VARCHAR(255) DEFAULT ''");
         } catch (Exception $e) {}
 
+        try {
+            $db->exec("ALTER TABLE bookings ADD COLUMN ufCrm29_1788553737348 TEXT");
+        } catch (Exception $e) {}
+
+        try {
+            $db->exec("ALTER TABLE bookings ADD COLUMN ufCrm29_1788553748580 TEXT");
+        } catch (Exception $e) {}
+
         // Insert Default Services & Staff if empty
         $stmt = $db->query("SELECT COUNT(*) FROM services");
         if ($stmt->fetchColumn() == 0) {

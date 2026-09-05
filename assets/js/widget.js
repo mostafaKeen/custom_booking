@@ -194,6 +194,7 @@ function loadCalendarBookings() {
             if (data.status === 'success') {
                 calResources = data.resources || [];
                 calBookings = data.bookings || [];
+                populateSpecialistFilterDropdowns();
                 renderCalendarGrid();
                 renderMiniMonth();
             } else {
@@ -308,6 +309,46 @@ function getResourceNamesLabel(rawResources) {
     return names.join(', ');
 }
 
+function populateSpecialistFilterDropdowns() {
+    var driverSelect = document.getElementById('cal_filter_driver');
+    var photoSelect = document.getElementById('cal_filter_photographer');
+
+    if (!driverSelect || !photoSelect) return;
+
+    var currentDriver = driverSelect.value || 'ALL';
+    var currentPhoto = photoSelect.value || 'ALL';
+
+    var driversMap = {};
+    var photoMap = {};
+
+    calBookings.forEach(function(b) {
+        if (b.driver_id && b.driver_name) {
+            driversMap[String(b.driver_id)] = b.driver_name;
+        }
+        if (b.photographer_id && b.photographer_name) {
+            photoMap[String(b.photographer_id)] = b.photographer_name;
+        }
+    });
+
+    driverSelect.innerHTML = '<option value="ALL">All Drivers</option>';
+    Object.keys(driversMap).forEach(function(dId) {
+        var opt = document.createElement('option');
+        opt.value = dId;
+        opt.textContent = driversMap[dId];
+        if (dId === currentDriver) opt.selected = true;
+        driverSelect.appendChild(opt);
+    });
+
+    photoSelect.innerHTML = '<option value="ALL">All Photographers</option>';
+    Object.keys(photoMap).forEach(function(pId) {
+        var opt = document.createElement('option');
+        opt.value = pId;
+        opt.textContent = photoMap[pId];
+        if (pId === currentPhoto) opt.selected = true;
+        photoSelect.appendChild(opt);
+    });
+}
+
 function applyCalendarFilters() {
     renderCalendarGrid();
 }
@@ -315,6 +356,8 @@ function applyCalendarFilters() {
 function placeEventCards(columns, timeSlots) {
     var statusFilter = document.getElementById('cal_filter_status') ? document.getElementById('cal_filter_status').value : 'ALL';
     var resourceFilter = document.getElementById('cal_filter_resource') ? document.getElementById('cal_filter_resource').value : 'ALL';
+    var driverFilter = document.getElementById('cal_filter_driver') ? document.getElementById('cal_filter_driver').value : 'ALL';
+    var photoFilter = document.getElementById('cal_filter_photographer') ? document.getElementById('cal_filter_photographer').value : 'ALL';
 
     // Map column index to list of booking events placed in it
     var colEventsMap = {};
@@ -347,6 +390,16 @@ function placeEventCards(columns, timeSlots) {
                 }
             }
             if (!isMatched) return;
+        }
+
+        // Driver filter check
+        if (driverFilter !== 'ALL') {
+            if (String(booking.driver_id || '') !== String(driverFilter)) return;
+        }
+
+        // Photographer filter check
+        if (photoFilter !== 'ALL') {
+            if (String(booking.photographer_id || '') !== String(photoFilter)) return;
         }
 
         // Determine which resource column(s) this booking belongs to
@@ -585,6 +638,8 @@ function showEventPopup(booking) {
                 '<div class="popup-row"><span class="popup-label">Photographer</span><span class="popup-value" style="font-weight:600; color:' + (booking.photographer_name ? '#6b21a8' : '#94a3b8') + ';">' + (booking.photographer_name ? ('📷 ' + escapeHtml(booking.photographer_name)) : 'None Assigned') + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Client</span><span class="popup-value">' + escapeHtml(booking.client_name || 'N/A') + '</span></div>' +
                 '<div class="popup-row"><span class="popup-label">Phone</span><span class="popup-value">' + escapeHtml(booking.client_phone || 'N/A') + '</span></div>' +
+                (booking.ufCrm29_1788553737348 ? '<div class="popup-row"><span class="popup-label">Transfer From</span><span class="popup-value">📍 ' + escapeHtml(booking.ufCrm29_1788553737348) + '</span></div>' : '') +
+                (booking.ufCrm29_1788553748580 ? '<div class="popup-row"><span class="popup-label">Transfer To</span><span class="popup-value">🏁 ' + escapeHtml(booking.ufCrm29_1788553748580) + '</span></div>' : '') +
                 (booking.created_by_name ? '<div class="popup-row"><span class="popup-label">Created By</span><span class="popup-value">' + escapeHtml(booking.created_by_name) + '</span></div>' : '') +
                 (crmLinkHtml ? '<div class="popup-row"><span class="popup-label">CRM</span><span class="popup-value">' + crmLinkHtml + '</span></div>' : '') +
             '</div>' +
@@ -947,6 +1002,8 @@ function setupEventListeners() {
             if (data.status === 'success') {
                 alert('Booking created successfully!');
                 document.getElementById('notes').value = '';
+                if (document.getElementById('ufCrm29_1788553737348')) document.getElementById('ufCrm29_1788553737348').value = '';
+                if (document.getElementById('ufCrm29_1788553748580')) document.getElementById('ufCrm29_1788553748580').value = '';
                 loadSlots();
                 if (entityType === 'NONE' || entityId === 0) {
                     loadAllBookings();
@@ -1061,6 +1118,8 @@ function renderBookingsList(data) {
                     '<strong>Driver:</strong> <span style="color:' + (b.driver_name ? '#1e40af' : '#94a3b8') + '; font-weight:600;">' + (b.driver_name ? ('🚗 ' + escapeHtml(b.driver_name)) : 'None Assigned') + '</span><br>' +
                     '<strong>Photographer:</strong> <span style="color:' + (b.photographer_name ? '#6b21a8' : '#94a3b8') + '; font-weight:600;">' + (b.photographer_name ? ('📷 ' + escapeHtml(b.photographer_name)) : 'None Assigned') + '</span><br>' +
                     '<strong>Client:</strong> ' + (b.client_name || 'N/A') + ' (' + (b.client_phone || 'N/A') + ')<br>' +
+                    (b.ufCrm29_1788553737348 ? '<strong>Transfer From:</strong> 📍 ' + escapeHtml(b.ufCrm29_1788553737348) + '<br>' : '') +
+                    (b.ufCrm29_1788553748580 ? '<strong>Transfer To:</strong> 🏁 ' + escapeHtml(b.ufCrm29_1788553748580) + '<br>' : '') +
                     (specialistHtml ? '<div style="margin-top:2px; margin-bottom:2px;">' + specialistHtml + '</div>' : '') +
                     '<strong>Created By:</strong> ' + (b.created_by_name || 'N/A') + '<br>' +
                     '<strong>Target Calendar:</strong> ' + (b.calendar_target === 'user' ? 'My Calendar' : (b.calendar_target === 'company_calendar' ? 'Public (Company Calendar)' : b.calendar_target)) +

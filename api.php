@@ -46,7 +46,7 @@ function enrichBookingsWithSpaData($bookings) {
         $res = CRest::call('crm.item.list', [
             'entityTypeId' => 1088,
             'filter' => ['@id' => $spaIds],
-            'select' => ['id', 'stageId', 'ufCrm29_1787324656', 'ufCrm29_1788295852', 'ufCrm29_1788416337', 'ufCrm29_1787324769682']
+            'select' => ['id', 'stageId', 'ufCrm29_1787324656', 'ufCrm29_1788295852', 'ufCrm29_1788416337', 'ufCrm29_1787324769682', 'ufCrm29_1788553737348', 'ufCrm29_1788553748580']
         ]);
 
         if (!empty($res['result']['items'])) {
@@ -57,6 +57,16 @@ function enrichBookingsWithSpaData($bookings) {
                 $driverId = (int)($item['ufCrm29_1788295852'] ?? 0);
                 $photographerId = (int)($item['ufCrm29_1788416337'] ?? 0);
                 $carId = $item['ufCrm29_1787324769682'] ?? '';
+
+                // Address fields handling (string or array from B24)
+                $transferFrom = $item['ufCrm29_1788553737348'] ?? '';
+                if (is_array($transferFrom)) {
+                    $transferFrom = $transferFrom['VALUE'] ?? ($transferFrom['text'] ?? implode(', ', array_filter($transferFrom)));
+                }
+                $transferTo = $item['ufCrm29_1788553748580'] ?? '';
+                if (is_array($transferTo)) {
+                    $transferTo = $transferTo['VALUE'] ?? ($transferTo['text'] ?? implode(', ', array_filter($transferTo)));
+                }
 
                 // Format resources string
                 $resStr = '';
@@ -93,7 +103,9 @@ function enrichBookingsWithSpaData($bookings) {
                     'driverName' => $driverName,
                     'photographerId' => $photographerId,
                     'photographerName' => $photographerName,
-                    'carId' => $carId
+                    'carId' => $carId,
+                    'transferFrom' => (string)$transferFrom,
+                    'transferTo' => (string)$transferTo
                 ];
             }
         }
@@ -114,6 +126,12 @@ function enrichBookingsWithSpaData($bookings) {
             $b['photographer_id'] = $spaInfo['photographerId'];
             $b['photographer_name'] = $spaInfo['photographerName'];
             $b['car_id'] = $spaInfo['carId'];
+            if (!empty($spaInfo['transferFrom'])) {
+                $b['ufCrm29_1788553737348'] = $spaInfo['transferFrom'];
+            }
+            if (!empty($spaInfo['transferTo'])) {
+                $b['ufCrm29_1788553748580'] = $spaInfo['transferTo'];
+            }
         } else {
             $b['driver_id'] = 0;
             $b['driver_name'] = '';
@@ -611,15 +629,21 @@ try {
                 $tripType = 0; // Not visible/applicable when Driver is not selected
             }
 
+            // Retrieve address fields
+            $transferFrom = trim($_REQUEST['ufCrm29_1788553737348'] ?? '');
+            $transferTo = trim($_REQUEST['ufCrm29_1788553748580'] ?? '');
+
             // Step 2: Insert into local DB
-            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1788299065411, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?, ?)");
+            $stmt = $db->prepare("INSERT INTO bookings (entity_type, entity_id, entity_title, client_name, client_phone, client_email, service_id, staff_id, booking_date, start_time, end_time, status, calendar_target, notes, ufCrm29_1787324188722, ufCrm29_1787324656, ufCrm29_1788299065411, created_by_name, ufCrm29_1788553737348, ufCrm29_1788553748580) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DT1088_37:NEW', ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $entityType, $entityId, $entityTitle, $clientName, $clientPhone, $clientEmail,
                 $serviceId, $staffId, $bookingDate, $startTime, $endTime, $calendarTarget, $notes,
                 is_array($bookingType) ? implode(',', $bookingType) : $bookingType,
                 is_array($resourcesList) ? implode(',', $resourcesList) : $resourcesList,
                 (int)$tripType,
-                $createdByName
+                $createdByName,
+                $transferFrom,
+                $transferTo
             ]);
             $bookingId = $db->lastInsertId();
             writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId, 'entity_title' => $entityTitle, 'created_by' => $createdByName]);
@@ -842,6 +866,14 @@ try {
 
             if (!empty($tripType) && (int)$tripType > 0) {
                 $spaFields['ufCrm29_1788299065411'] = intval($tripType);
+            }
+
+            if (!empty($transferFrom)) {
+                $spaFields['ufCrm29_1788553737348'] = $transferFrom;
+            }
+
+            if (!empty($transferTo)) {
+                $spaFields['ufCrm29_1788553748580'] = $transferTo;
             }
 
             $spaRes = CRest::call('crm.item.add', [

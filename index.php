@@ -118,6 +118,16 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                         <input type="text" id="client_phone" name="client_phone" class="form-control" placeholder="+123456789">
                     </div>
 
+                    <div class="form-group" id="transfer_from_group">
+                        <label for="ufCrm29_1788553737348">Transfer From (Address)</label>
+                        <input type="text" id="ufCrm29_1788553737348" name="ufCrm29_1788553737348" class="form-control" placeholder="Pickup Address / Location">
+                    </div>
+
+                    <div class="form-group" id="transfer_to_group">
+                        <label for="ufCrm29_1788553748580">Transfer To (Address)</label>
+                        <input type="text" id="ufCrm29_1788553748580" name="ufCrm29_1788553748580" class="form-control" placeholder="Drop-off Address / Destination">
+                    </div>
+
                     <div class="form-group">
                         <label for="notes">Notes / Requirements</label>
                         <textarea id="notes" name="notes" class="form-control" rows="2" placeholder="Optional notes for appointment..."></textarea>
@@ -167,6 +177,18 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                                     <option value="701">Meeting Room</option>
                                     <option value="703">Photo Grapher</option>
                                     <option value="705">Video Grapher</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 2px; display: block;">Driver Filter</label>
+                                <select id="cal_filter_driver" onchange="applyCalendarFilters()" class="form-control" style="font-size: 12px; padding: 4px 8px; height: 32px;">
+                                    <option value="ALL">All Drivers</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 2px; display: block;">Photographer Filter</label>
+                                <select id="cal_filter_photographer" onchange="applyCalendarFilters()" class="form-control" style="font-size: 12px; padding: 4px 8px; height: 32px;">
+                                    <option value="ALL">All Photographers</option>
                                 </select>
                             </div>
                         </div>
