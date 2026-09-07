@@ -505,12 +505,23 @@ try {
             }
 
             $bookingDate = $_REQUEST['booking_date'] ?? date('Y-m-d');
-            $startTime = $_REQUEST['start_time'] ?? '09:00:00';
+            $startTimeInput = $_REQUEST['start_time'] ?? '09:00';
+            // Ensure format HH:MM:SS
+            $startTime = (strlen($startTimeInput) === 5) ? ($startTimeInput . ':00') : $startTimeInput;
+
             $calendarTarget = $_REQUEST['calendar_target'] ?? 'user';
             $clientName = trim($_REQUEST['client_name'] ?? '');
             $clientPhone = trim($_REQUEST['client_phone'] ?? '');
             $clientEmail = trim($_REQUEST['client_email'] ?? '');
             $notes = trim($_REQUEST['notes'] ?? '');
+
+            // Calculate duration in minutes from duration_hours and duration_minutes
+            $durationHours = (int)($_REQUEST['duration_hours'] ?? 0);
+            $durationMinutes = (int)($_REQUEST['duration_minutes'] ?? 0);
+            $totalDuration = ($durationHours * 60) + $durationMinutes;
+            if ($totalDuration <= 0) {
+                $totalDuration = 30; // default fallback
+            }
 
             writeLog("CREATE_BOOKING_START", [
                 'entityType' => $entityType,
@@ -520,19 +531,19 @@ try {
                 'resourceIds' => $resourceIds,
                 'bookingDate' => $bookingDate,
                 'startTime' => $startTime,
+                'durationMinutes' => $totalDuration,
                 'calendarTarget' => $calendarTarget,
                 'clientName' => $clientName
             ]);
 
-            // Calculate end time based on service duration
-            $stmt = $db->prepare("SELECT name, duration_minutes FROM services WHERE id = ?");
+            // Calculate service details & end time
+            $stmt = $db->prepare("SELECT name FROM services WHERE id = ?");
             $stmt->execute([$serviceId]);
             $service = $stmt->fetch(PDO::FETCH_ASSOC);
             $serviceName = $service ? $service['name'] : 'Appointment';
-            $duration = $service ? (int)$service['duration_minutes'] : 30;
 
             $startTs = strtotime($bookingDate . ' ' . $startTime);
-            $endTs = $startTs + ($duration * 60);
+            $endTs = $startTs + ($totalDuration * 60);
             $endTime = date('H:i:s', $endTs);
 
             // Fetch staff details

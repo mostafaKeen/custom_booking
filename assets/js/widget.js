@@ -821,7 +821,6 @@ function loadServicesAndStaff() {
                 }
 
                 document.getElementById('booking_date').value = new Date().toISOString().split('T')[0];
-                loadSlots();
                 handleDriverTripTypeRules();
             }
         })
@@ -941,18 +940,6 @@ function loadSlots() {
 }
 
 function setupEventListeners() {
-    var serviceEl = document.getElementById('service_id');
-    if (serviceEl) serviceEl.addEventListener('change', loadSlots);
-    var staffEl = document.getElementById('staff_id');
-    if (staffEl) staffEl.addEventListener('change', loadSlots);
-    
-    document.getElementById('booking_date').addEventListener('change', loadSlots);
-    
-    var applyBtn = document.getElementById('apply_duration_btn');
-    if (applyBtn) {
-        applyBtn.addEventListener('click', loadSlots);
-    }
-
     var b24ResSelect = document.getElementById('b24_resource_id');
     if (b24ResSelect) {
         b24ResSelect.addEventListener('change', handleDriverTripTypeRules);
@@ -965,8 +952,17 @@ function setupEventListeners() {
 
     document.getElementById('booking_form').addEventListener('submit', function(e) {
         e.preventDefault();
-        if (!selectedSlot) {
-            alert('Please select an available time slot.');
+        
+        var startTimeVal = document.getElementById('start_time') ? document.getElementById('start_time').value : '';
+        if (!startTimeVal) {
+            alert('Please select a valid Start Time.');
+            return;
+        }
+
+        var hrs = parseInt(document.getElementById('duration_hours') ? document.getElementById('duration_hours').value : '0', 10) || 0;
+        var mins = parseInt(document.getElementById('duration_minutes') ? document.getElementById('duration_minutes').value : '0', 10) || 0;
+        if ((hrs * 60 + mins) <= 0) {
+            alert('Please enter a duration greater than 0 minutes.');
             return;
         }
 
@@ -994,7 +990,6 @@ function setupEventListeners() {
         formData.append('action', 'create_booking');
         formData.append('entity_type', entityType);
         formData.append('entity_id', entityId);
-        formData.append('start_time', selectedSlot);
 
         const postUrl = 'api.php?' + getAuthParams().substring(1);
 
@@ -1009,8 +1004,11 @@ function setupEventListeners() {
                 document.getElementById('notes').value = '';
                 if (document.getElementById('ufCrm29_1788553737348')) document.getElementById('ufCrm29_1788553737348').value = '';
                 if (document.getElementById('ufCrm29_1788553748580')) document.getElementById('ufCrm29_1788553748580').value = '';
-                loadSlots();
-                if (entityType === 'NONE' || entityId === 0) {
+                
+                if (calCurrentView === 'calendar') {
+                    loadCalendarBookings();
+                }
+                if (placementInfo.entityId == 0) {
                     loadAllBookings();
                 } else {
                     loadEntityBookings();

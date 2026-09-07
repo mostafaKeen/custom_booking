@@ -78,7 +78,17 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                     </div>
 
                     <div class="form-group">
-                        <label>Slot Duration *</label>
+                        <label for="booking_date">Appointment Date *</label>
+                        <input type="date" id="booking_date" name="booking_date" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="start_time">Start Time *</label>
+                        <input type="time" id="start_time" name="start_time" class="form-control" value="09:00" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Appointment Duration *</label>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <div style="flex: 1;">
                                 <small style="display: block; color: #64748b; margin-bottom: 2px;">Hours</small>
@@ -88,21 +98,6 @@ $isWritable = is_writable(__DIR__) || (is_dir(__DIR__ . '/data') && is_writable(
                                 <small style="display: block; color: #64748b; margin-bottom: 2px;">Minutes</small>
                                 <input type="number" id="duration_minutes" name="duration_minutes" class="form-control" min="0" max="59" value="30" placeholder="30">
                             </div>
-                            <div style="margin-top: 14px;">
-                                <button type="button" id="apply_duration_btn" class="btn btn-primary" style="padding: 8px 14px; white-space: nowrap; height: 38px;">Apply</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="booking_date">Appointment Date</label>
-                        <input type="date" id="booking_date" name="booking_date" class="form-control" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Available Time Slots</label>
-                        <div id="slots_container" class="slots-container">
-                            <!-- Dynamically loaded slot buttons -->
                         </div>
                     </div>
 
