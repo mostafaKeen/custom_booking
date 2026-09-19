@@ -664,14 +664,87 @@ try {
             $bookingId = $db->lastInsertId();
             writeLog("STEP_1_LOCAL_DB_INSERT_SUCCESS", ['booking_id' => $bookingId, 'entity_title' => $entityTitle, 'created_by' => $createdByName]);
 
-            // Step 3: Create CRM Activity (crm.activity.add) with COMMUNICATIONS
+            // Step 3: Create CRM Activity & Calendar Event Description
             $activitySubject = "Booking: {$serviceName} with {$staffName}";
-            $activityDesc = "Appointment Details:\n"
+
+            // Map numeric IDs to human readable names for description
+            $resourceMap = [
+                699 => 'Driver',
+                701 => 'Meeting Room',
+                703 => 'Photo Grapher',
+                705 => 'Video Grapher'
+            ];
+            $bookingTypeMap = [
+                685 => 'Resource',
+                687 => 'Viewing',
+                689 => 'Meeting'
+            ];
+            $tripTypeMap = [
+                757 => 'Pick Up & Drop Off',
+                759 => 'Pick Up',
+                761 => 'Drop Off'
+            ];
+
+            $resourcesSelectedNames = [];
+            if (is_array($resourcesList)) {
+                foreach ($resourcesList as $rId) {
+                    if (isset($resourceMap[(int)$rId])) $resourcesSelectedNames[] = $resourceMap[(int)$rId];
+                }
+            }
+            $resourcesText = !empty($resourcesSelectedNames) ? implode(', ', $resourcesSelectedNames) : 'None';
+
+            $bookingTypeNames = [];
+            if (is_array($bookingType)) {
+                foreach ($bookingType as $btId) {
+                    if (isset($bookingTypeMap[(int)$btId])) $bookingTypeNames[] = $bookingTypeMap[(int)$btId];
+                }
+            } elseif (isset($bookingTypeMap[(int)$bookingType])) {
+                $bookingTypeNames[] = $bookingTypeMap[(int)$bookingType];
+            }
+            $bookingTypeText = !empty($bookingTypeNames) ? implode(', ', $bookingTypeNames) : 'N/A';
+
+            $tripTypeText = $tripTypeMap[(int)$tripType] ?? 'N/A';
+
+            // Location string for Bitrix24 Calendar location parameter
+            $calendarLocation = '';
+            if (!empty($transferFrom) && !empty($transferTo)) {
+                $calendarLocation = "From: {$transferFrom} -> To: {$transferTo}";
+            } elseif (!empty($transferFrom)) {
+                $calendarLocation = "From: {$transferFrom}";
+            } elseif (!empty($transferTo)) {
+                $calendarLocation = "To: {$transferTo}";
+            }
+
+            // Detailed description block
+            $activityDesc = "APPOINTMENT DETAILS:\n"
+                . "------------------------------\n"
                 . "Service: {$serviceName}\n"
-                . "Date & Time: {$bookingDate} " . date('h:i A', $startTs) . " - " . date('h:i A', $endTs) . "\n"
-                . "Client: {$clientName} ({$clientPhone})\n"
+                . "Date & Time: {$bookingDate} (" . date('h:i A', $startTs) . " - " . date('h:i A', $endTs) . ")\n"
                 . "Specialist: {$staffName}\n"
-                . "Notes: {$notes}";
+                . "Created By: {$createdByName}\n\n"
+                . "CLIENT INFORMATION:\n"
+                . "------------------------------\n"
+                . "Client Name: {$clientName}\n"
+                . "Phone: " . ($clientPhone ?: 'N/A') . "\n"
+                . "Email: " . ($clientEmail ?: 'N/A') . "\n\n"
+                . "BOOKING CONFIGURATION:\n"
+                . "------------------------------\n"
+                . "Booking Type: {$bookingTypeText}\n"
+                . "Resources: {$resourcesText}\n";
+
+            if ($isDriverSelected || !empty($transferFrom) || !empty($transferTo)) {
+                $activityDesc .= "\nTRANSFER / ADDRESS DETAILS:\n"
+                    . "------------------------------\n"
+                    . "Trip Type: {$tripTypeText}\n"
+                    . "Pick-Up Address: " . ($transferFrom ?: 'Not specified') . "\n"
+                    . "Drop-Off Address: " . ($transferTo ?: 'Not specified') . "\n";
+            }
+
+            if (!empty($notes)) {
+                $activityDesc .= "\nNOTES / INSTRUCTIONS:\n"
+                    . "------------------------------\n"
+                    . "{$notes}\n";
+            }
 
             $b24ActivityId = 0;
             if ($entityId > 0 && $entityType !== 'NONE') {
@@ -713,6 +786,10 @@ try {
 
                 if (!empty($communications)) {
                     $activityFields['COMMUNICATIONS'] = $communications;
+                }
+
+                if (!empty($calendarLocation)) {
+                    $activityFields['LOCATION'] = $calendarLocation;
                 }
 
                 $activityRes = CRest::call('crm.activity.add', ['fields' => $activityFields]);
@@ -760,7 +837,12 @@ try {
                 'skip_time' => 'N',
                 'private_event' => 'N',
                 'attendees' => $attendees,
+                'importance' => $isDriverSelected ? 'high' : 'normal',
             ];
+
+            if (!empty($calendarLocation)) {
+                $eventParams['location'] = $calendarLocation;
+            }
 
             if ($entityId > 0 && $entityType !== 'NONE') {
                 $crmLink = ($entityType === 'LEAD' ? 'L_' : 'D_') . $entityId;
