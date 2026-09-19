@@ -2,6 +2,7 @@
 /**
  * Bitrix24 Custom Booking Widget Configuration
  */
+date_default_timezone_set('Asia/Dubai');
 
 // Load local overrides if present (e.g. C_REST_CLIENT_SECRET, custom DB, etc.)
 if (file_exists(__DIR__ . '/config.local.php')) {

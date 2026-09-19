@@ -2,6 +2,7 @@
 /**
  * Main Booking Widget Iframe Handler (CRM_LEAD_DETAIL_TAB / CRM_DEAL_DETAIL_TAB)
  */
+date_default_timezone_set('Asia/Dubai');
 require_once __DIR__ . '/crest.php';
 require_once __DIR__ . '/db.php';
 

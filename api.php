@@ -2,6 +2,7 @@
 /**
  * AJAX API Handler for Custom Booking Widget with Comprehensive Logging
  */
+date_default_timezone_set('Asia/Dubai');
 error_reporting(0);
 ini_set('display_errors', 0);
 header('Content-Type: application/json');
@@ -836,6 +837,8 @@ try {
                 'to' => date('Y-m-d H:i:s', $endTs),
                 'from_ts' => $startTs,
                 'to_ts' => $endTs,
+                'timezone_from' => 'Asia/Dubai',
+                'timezone_to' => 'Asia/Dubai',
                 'skip_time' => 'N',
                 'private_event' => 'N',
                 'is_meeting' => 'Y',
