@@ -720,24 +720,26 @@ try {
                 $b24ActivityId = $activityRes['result'] ?? 0;
             }
 
-            // Step 4: Create Calendar Event (user calendar or company calendar)
+            // Step 4: Create Calendar Event on Bitrix24 User's Personal Calendar
             $b24CalendarEventId = 0;
+            $calType = 'user';
 
-            // Determine calendar type and owner ID based on target
-            if ($calendarTarget === 'user') {
-                $calType = 'user';
-                $currentUserRes = CRest::call('user.current', []);
-                writeLog("STEP_4_USER_CURRENT", $currentUserRes);
-                $calOwnerId = !empty($currentUserRes['result']['ID']) ? (int)$currentUserRes['result']['ID'] : $ownerId;
+            // Retrieve currently logged-in Bitrix24 user
+            $currentUserRes = CRest::call('user.current', []);
+            writeLog("STEP_4_USER_CURRENT", $currentUserRes);
+            $currentUserId = !empty($currentUserRes['result']['ID']) ? (int)$currentUserRes['result']['ID'] : 0;
+
+            // Prioritize currently logged-in user, fallback to assigned owner / staff ID
+            if ($currentUserId > 0) {
+                $calOwnerId = $currentUserId;
             } else {
-                $calType = 'company_calendar';
-                $calOwnerId = 0;
+                $calOwnerId = ($ownerId > 0) ? $ownerId : $b24UserId;
             }
 
-            // Retrieve section ID dynamically to avoid permission/invalid section issues
+            // Retrieve personal calendar section dynamically for this user
             $calSectionId = 0;
             $sectionsRes = CRest::call('calendar.section.get', [
-                'type' => $calType,
+                'type' => 'user',
                 'ownerId' => $calOwnerId
             ]);
             writeLog("STEP_4_CALENDAR_SECTION_GET", $sectionsRes);
@@ -745,8 +747,11 @@ try {
                 $calSectionId = (int)$sectionsRes['result'][0]['ID'];
             }
 
+            // Build attendees list (current logged-in user, staff member, and responsible CRM owner)
+            $attendees = array_values(array_unique(array_filter([$calOwnerId, $b24UserId, $ownerId])));
+
             $eventParams = [
-                'type' => $calType,
+                'type' => 'user',
                 'ownerId' => $calOwnerId,
                 'name' => "Appointment: {$serviceName} - {$clientName}",
                 'description' => $activityDesc,
@@ -754,6 +759,7 @@ try {
                 'to' => date('d.m.Y H:i:s', $endTs),
                 'skip_time' => 'N',
                 'private_event' => 'N',
+                'attendees' => $attendees,
             ];
 
             if ($entityId > 0 && $entityType !== 'NONE') {

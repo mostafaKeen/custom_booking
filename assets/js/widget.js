@@ -1125,7 +1125,7 @@ function renderBookingsList(data) {
                     (b.ufCrm29_1788553748580 ? '<strong>Transfer To:</strong> 🏁 ' + escapeHtml(b.ufCrm29_1788553748580) + '<br>' : '') +
                     (specialistHtml ? '<div style="margin-top:2px; margin-bottom:2px;">' + specialistHtml + '</div>' : '') +
                     '<strong>Created By:</strong> ' + (b.created_by_name || 'N/A') + '<br>' +
-                    '<strong>Target Calendar:</strong> ' + (b.calendar_target === 'user' ? 'My Calendar' : (b.calendar_target === 'company_calendar' ? 'Public (Company Calendar)' : b.calendar_target)) +
+                    '<strong>Target Calendar:</strong> ' + (b.calendar_target === 'company_calendar' ? 'Public (Company Calendar)' : 'User Personal Calendar') +
                 '</div>' +
                 '<div class="booking-actions" style="margin-top: 10px; display: flex; flex-wrap: wrap;">' +
                     buttonsHtml +
