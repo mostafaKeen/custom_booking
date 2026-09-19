@@ -832,11 +832,20 @@ try {
                 'ownerId' => $calOwnerId,
                 'name' => "Appointment: {$serviceName} - {$clientName}",
                 'description' => $activityDesc,
-                'from' => date('d.m.Y H:i:s', $startTs),
-                'to' => date('d.m.Y H:i:s', $endTs),
+                'from' => date('Y-m-d H:i:s', $startTs),
+                'to' => date('Y-m-d H:i:s', $endTs),
+                'from_ts' => $startTs,
+                'to_ts' => $endTs,
                 'skip_time' => 'N',
                 'private_event' => 'N',
+                'is_meeting' => 'Y',
+                'host' => $calOwnerId,
                 'attendees' => $attendees,
+                'meeting' => [
+                    'notify' => false,
+                    'reinvite' => false,
+                    'allow_invite' => true,
+                ],
                 'importance' => $isDriverSelected ? 'high' : 'normal',
             ];
 
