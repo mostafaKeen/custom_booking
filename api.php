@@ -46,7 +46,7 @@ function enrichBookingsWithSpaData($bookings) {
         $res = CRest::call('crm.item.list', [
             'entityTypeId' => 1088,
             'filter' => ['@id' => $spaIds],
-            'select' => ['id', 'stageId', 'ufCrm29_1787324656', 'ufCrm29_1788295852', 'ufCrm29_1788416337', 'ufCrm29_1787324769682', 'ufCrm29_1788553737348', 'ufCrm29_1788553748580']
+            'select' => ['id', 'stageId', 'ufCrm29_1787324656', 'ufCrm29_1788295852', 'ufCrm29_1788416337', 'ufCrm29_1787324769682', 'ufCrm29_1788553737348', 'ufCrm29_1788553748580', 'ufCrm29_1788280834094', 'ufCrm29_1788280844127']
         ]);
 
         if (!empty($res['result']['items'])) {
@@ -956,7 +956,9 @@ try {
             $spaFields = [
                 'title' => "Booking: {$serviceName} - {$clientName}",
                 'assignedById' => $ownerId,
-                'stageId' => 'DT1088_37:NEW'
+                'stageId' => 'DT1088_37:NEW',
+                'ufCrm29_1788280834094' => date('c', $startTs),
+                'ufCrm29_1788280844127' => date('c', $endTs)
             ];
             if ($entityType === 'LEAD') {
                 $spaFields['parentId1'] = $entityId;
